@@ -1,0 +1,268 @@
+FRAUD - AML GRAPH PROJESI
+YENIDEN YAPILABILIRLIK (REBUILDABILITY) MASTER RAPORU
+Tarih: 26 Subat 2026
+
+====================================================================
+0) RAPOR AMACI
+====================================================================
+Bu raporun amaci, projeyi sifirdan tekrar kurup calisir hale getirme olasiligini,
+risklerini, teknik bagimliliklarini ve uygulama yol haritasini operasyonel
+ayrinti seviyesinde tanimlamaktir.
+
+====================================================================
+1) YENIDEN YAPILABILIRLIK DEGERLENDIRME MODELI
+====================================================================
+1.1 Skorlama Olcegi
+- 0: Yok
+- 1: Cok zayif
+- 2: Kismi
+- 3: Islevsel
+- 4: Guclu
+- 5: Uretim seviyesinde
+
+1.2 Boyutlar
+A) Artefakt Tamligi
+B) Ortam Tekrar Uretilebilirligi
+C) Veri Tekrar Uretilebilirligi
+D) Pipeline Determinizmi
+E) Deney Izlenebilirligi
+F) Dagitim Tekrar Uretilebilirligi
+G) Monitoring Tekrar Uretilebilirligi
+H) Guvenlik ve Uyum Tekrar Uretilebilirligi
+
+====================================================================
+2) MEVCUT DURUM SKORLARI (FIILI DEPOYA GORE)
+====================================================================
+A) Artefakt Tamligi: 2/5
+- Tasarim dokumani guclu
+- Kod, test, CI dosyalari yok
+
+B) Ortam Tekrar Uretilebilirligi: 1/5
+- lockfile, container, makefile yok
+
+C) Veri Tekrar Uretilebilirligi: 3/5
+- Kaynak listesi net
+- Indirme scripti/checksum mekanizmasi yok
+
+D) Pipeline Determinizmi: 1/5
+- DAG tanimi ve kodu yok
+
+E) Deney Izlenebilirligi: 1/5
+- MLflow niyeti var, implementasyon yok
+
+F) Dagitim Tekrar Uretilebilirligi: 1/5
+- API/serving kodu yok
+
+G) Monitoring Tekrar Uretilebilirligi: 1/5
+- PSI/KS kavramsal olarak var, job yok
+
+H) Guvenlik ve Uyum Tekrar Uretilebilirligi: 2/5
+- Kontrol prensipleri net
+- Teknik enforcement ve test kaniti yok
+
+Toplam olgunluk skoru: 1.5 / 5
+
+Yorum:
+- Proje su an "dokuman seviyesinde yeniden yapilabilir".
+- "Calisan sistem seviyesinde yeniden yapilabilir" olmak icin temel muhendislik
+  artefaktlari olusturulmalidir.
+
+====================================================================
+3) KRITIK RISKLER VE BLOKLAYICILAR
+====================================================================
+R1) Data licensing ve data handling riski
+- Cozum: data registry + licence manifest + no-raw-data policy gate
+
+R2) Point-in-time leakage riski
+- Cozum: feature-time kural testleri + dbt generic/singular testler
+
+R3) Imbalanced data sebebiyle yalanci performans riski
+- Cozum: PR-AUC/AP zorunlu raporlama + cost-sensitive threshold
+
+R4) Investigator overload riski
+- Cozum: ranking katmani + queue-level KPI
+
+R5) LLM prompt injection / disclosure riski
+- Cozum: retrieval sandbox + redaction + strict tool allowlist
+
+R6) Reproducibility kaybi riski
+- Cozum: pinned dependencies + deterministic seeds + artifact lineage
+
+====================================================================
+4) HEDEF TEKNIK DURUM (TARGET STATE)
+====================================================================
+4.1 Minimum Rebuildable Product (MRP)
+Asagidaki 6 sistem birlikte calisiyorsa rebuild tamam sayilir:
+1. Veri ingestor + adapter
+2. dbt staging/marts + test
+3. Feature builder (point-in-time)
+4. Fraud model train/eval + artifact kaydi
+5. Alert ranking + queue cikisi
+6. Monitoring + audit log
+
+4.2 Birinci Faz Dosya Agaci (zorunlu)
+- adapters/
+- dbt/
+- features/
+- models/
+- ranking/
+- graph/
+- serving/
+- monitoring/
+- orchestration/
+- docs/
+- tests/
+- scripts/
+- Makefile
+- pyproject.toml
+- requirements.lock
+- .github/workflows/ci.yml
+
+====================================================================
+5) UYGULAMA PLANI (12 HAFTALIK)
+====================================================================
+Faz 1 (Hafta 1-2): Proje iskeleti ve ortam
+- Standart repo yapisi
+- Deterministic environment
+- Make komutlari
+- Pre-commit + lint + basic tests
+
+Faz 2 (Hafta 3-4): Veri katmani
+- En az 2 dataset adapter
+- canonical transaction_event tablosu
+- data contracts
+- data licence manifest
+
+Faz 3 (Hafta 5-6): dbt ve leakage korumasi
+- staging + marts
+- unique/not_null/relationships
+- singular leakage tests
+- CI'da dbt build + test gate
+
+Faz 4 (Hafta 7-8): Modeling + ranking
+- Fraud baseline (PR-AUC/AP)
+- Cost-based threshold optimizer
+- LambdaRank queue model
+- NDCG@K raporlamasi
+
+Faz 5 (Hafta 9-10): Serving + monitoring
+- Batch + online scoring
+- PSI + KS drift jobs
+- metrics export ve dashboard
+
+Faz 6 (Hafta 11-12): Copilot + governance
+- Grounded RAG pipeline
+- redaction guardrails
+- immutable audit logs
+- model card + datasheet + risk register
+
+====================================================================
+6) TEKRAR URETILEBILIR CALISTIRMA KOMUTLARI (HEDEF)
+====================================================================
+Kurulum:
+- make setup
+
+Veri:
+- make ingest DATASET=paysim
+- make ingest DATASET=aml_data
+
+Modelleme:
+- make dbt_build
+- make train_fraud
+- make build_features
+- make rank_queue
+
+Servis ve izleme:
+- make serve
+- make monitor_drift
+- make dashboard
+
+CI:
+- make ci_local
+
+====================================================================
+7) KALITE KAPILARI (QUALITY GATES)
+====================================================================
+Gate 1: Data Quality
+- dbt key testlerinde 0 failure
+
+Gate 2: Leakage Safety
+- feature-time violation sayisi 0
+
+Gate 3: Model Utility
+- PR-AUC/AP baseline ustunde
+
+Gate 4: Ranking Utility
+- NDCG@K heuristic baseline ustunde
+
+Gate 5: Reproducibility
+- Temiz makinede tek komut kurulumu
+- Ayni seed ile benzer metrik penceresi
+
+Gate 6: Security
+- Prompt injection test seti gecis
+- PII redaction regression test gecis
+
+Gate 7: Auditability
+- Her prediction icin model_version + feature snapshot + explanation id
+
+====================================================================
+8) YONETISIM VE DOKUMANTASYON GEREKSINIMLERI
+====================================================================
+Zorunlu dokumanlar:
+- Architecture Decision Records (ADR)
+- Threat model
+- Data licence matrix
+- Model card
+- Datasheet for datasets
+- Incident runbook
+- Rollback runbook
+
+Bu artefaktlar olmadan bank-tech seviyesinde guven ve denetim iddiasi zayif kalir.
+
+====================================================================
+9) REBUILDABILITY ICIN HIZLI KAZANIMLAR (ILK 10 GUN)
+====================================================================
+1. Repo iskeleti + Makefile + pyproject
+2. Iki adapter ve canonical sema
+3. dbt skeleton ve en az 4 test
+4. Basit fraud baseline notebook yerine script
+5. CI'da lint + test + dbt gate
+6. .gitignore ve data commit korumasi
+
+Bu 6 adim atildiginda proje, "dokuman" olmaktan cikarak "olculebilir muhendislik
+urunune" donusmeye baslar.
+
+====================================================================
+10) YATIRIM/EMEK TAHMINI
+====================================================================
+Kucuk ekip (1-2 kisi) tahmini:
+- PoC rebuild: 8-12 hafta
+- Uretime yakin demo: 12-16 hafta
+- Sertlestirme + guvenlik + governance: +4-8 hafta
+
+Tek kisilik ilerleme icin kritik kosul:
+- Scope freeze + haftalik deliverable disiplini
+
+====================================================================
+11) SON KARAR
+====================================================================
+Bu proje yeniden yapilabilir mi?
+- Evet.
+
+Bugun yeniden yapilabilirlik seviyesi nedir?
+- Dusuk-orta (1.5/5), cunku kod tabani yok.
+
+Neden yine de potansiyel yuksek?
+- Mimari kapsam, veri kaynagi secimi, leakage farkindaligi,
+  ranking odagi ve guvenlik catisi dogru kurulmus.
+
+Basari kosulu nedir?
+- Tasarimi implementasyona ceviren disiplinli muhendislik:
+  kod + test + CI + governance + audit.
+
+Bu master raporun sonucu:
+- Dogru teknik yonetimle proje yeniden kurulabilir.
+- Yeniden kurulum sonrasi bank-tech portfoyunde yuksek etki uretir.
+- Rebuild surecinin merkezinde deterministik pipeline ve leakage-safe feature
+  uretimi olmalidir.

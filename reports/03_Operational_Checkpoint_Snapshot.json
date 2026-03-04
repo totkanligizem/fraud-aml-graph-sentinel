@@ -1,0 +1,305 @@
+{
+  "generated_at_utc": "2026-03-04T21:01:32Z",
+  "warehouse_summary": {
+    "created_at_utc": "2026-02-27T12:57:09Z",
+    "db_path": "data/warehouse/ledger_sentinel.db",
+    "datasets": {
+      "ieee_cis": 300000,
+      "creditcard_fraud": 284807,
+      "paysim": 300000,
+      "ibm_aml_data": 300000
+    },
+    "runs": {
+      "ieee_cis": "20260227T120341Z",
+      "creditcard_fraud": "20260227T120341Z",
+      "paysim": "20260227T120341Z",
+      "ibm_aml_data": "20260227T122422Z"
+    },
+    "table_counts": {
+      "transaction_event_raw": 1184807,
+      "stg_transaction_event": 1184807,
+      "transaction_mart": 1184807,
+      "feature_payer_24h": 150000,
+      "monitoring_mart": 90
+    }
+  },
+  "scoring_summary": {
+    "created_at_utc": "2026-02-27T12:58:04Z",
+    "db_path": "data/warehouse/ledger_sentinel.db",
+    "model_path": "artifacts/models/fraud_baseline/latest/model.npz",
+    "datasets": [
+      "ieee_cis",
+      "creditcard_fraud",
+      "paysim"
+    ],
+    "total_scored_rows": 884807,
+    "rows_by_dataset": {
+      "ieee_cis": 300000,
+      "creditcard_fraud": 284807,
+      "paysim": 300000
+    }
+  },
+  "ranking_summary": {
+    "created_at_utc": "2026-02-27T12:58:36Z",
+    "db_path": "data/warehouse/ledger_sentinel.db",
+    "top_k": 50,
+    "queue_count": 88,
+    "mean_precision_at_k": 0.07454545454545455,
+    "mean_ndcg_at_k": 0.07110223393672412,
+    "median_precision_at_k": 0.05,
+    "median_ndcg_at_k": 0.04950777378008861,
+    "queues_with_positive_labels": 88
+  },
+  "graph_summary": {
+    "created_at_utc": "2026-02-27T12:59:35Z",
+    "db_path": "data/warehouse/ledger_sentinel.db",
+    "fraud_score_threshold": 0.8,
+    "cluster_edge_risk_threshold": 0.65,
+    "min_cluster_size": 2,
+    "table_counts": {
+      "graph_party_node": 582652,
+      "graph_party_edge": 462948,
+      "graph_account_node": 582652,
+      "graph_account_edge": 462948,
+      "graph_party_cluster_membership": 445060,
+      "graph_party_cluster_summary": 134702
+    },
+    "cluster_summary": {
+      "cluster_count": 134702,
+      "cluster_membership_rows": 445060,
+      "suspicious_edge_count": 328952
+    }
+  },
+  "bigquery_state": {
+    "created_at_utc": "2026-03-04T20:35:55Z",
+    "project_id": "fraud-aml-graph",
+    "dataset_id": "fraud_aml_graph_dev",
+    "location": "EU",
+    "require_graph": true,
+    "ok": true,
+    "table_counts": {
+      "dev_transaction_mart": 1184807,
+      "dev_feature_payer_24h": 150000,
+      "dev_monitoring_mart": 90,
+      "dev_fraud_scores": 884807,
+      "dev_alert_queue": 884807,
+      "dev_alert_queue_top50": 4400,
+      "dev_risk_dashboard_daily": 90,
+      "dev_graph_party_node": 582652,
+      "dev_graph_party_edge": 462948,
+      "dev_graph_account_node": 582652,
+      "dev_graph_account_edge": 462948,
+      "dev_graph_party_cluster_membership": 445060,
+      "dev_graph_party_cluster_summary": 134702
+    },
+    "quality_metrics": {
+      "null_event_id_transaction_mart": 0,
+      "null_source_event_id_transaction_mart": 0,
+      "duplicate_event_id_transaction_mart": 0,
+      "invalid_fraud_score_range": 0,
+      "invalid_alert_queue_rank": 0,
+      "missing_alert_queue_id": 0,
+      "invalid_label_aml_transaction_mart": 0
+    },
+    "graph_quality_metrics": {
+      "null_graph_party_node_id": 0,
+      "duplicate_graph_party_node_id": 0,
+      "invalid_graph_party_edge_risk_score": 0,
+      "cluster_membership_without_summary": 0,
+      "shared_party_account_node_ids": 0,
+      "shared_party_account_edge_pairs": 0
+    },
+    "fraud_scores_rows_by_dataset": {
+      "creditcard_fraud": 284807,
+      "ieee_cis": 300000,
+      "paysim": 300000
+    },
+    "distinct_queue_id_count": 88,
+    "errors": []
+  },
+  "model_metrics": {
+    "run_id": "20260226T213301Z",
+    "created_at_utc": "2026-02-26T21:33:01Z",
+    "db_path": "data/warehouse/ledger_sentinel.db",
+    "datasets": [
+      "ieee_cis",
+      "creditcard_fraud",
+      "paysim"
+    ],
+    "loaded_rows": 884807,
+    "train_rows": 707845,
+    "valid_rows": 176962,
+    "feature_count": 31,
+    "class_balance": {
+      "train_positive": 3630,
+      "train_negative": 704215,
+      "valid_positive": 7142,
+      "valid_negative": 169820
+    },
+    "metrics": {
+      "average_precision": 0.04240917825737341,
+      "pr_auc_trapz": 0.04237270148500237
+    },
+    "cost_optimized_threshold": {
+      "threshold": 0.6248615207700052,
+      "cost": 171001.0,
+      "tp": 7090.0,
+      "fp": 169701.0,
+      "tn": 119.0,
+      "fn": 52.0,
+      "precision": 0.04010385144040138,
+      "recall": 0.9927191262951555
+    },
+    "training": {
+      "epochs": 8,
+      "learning_rate": 0.05,
+      "l2": 0.0001,
+      "batch_size": 65536,
+      "seed": 42,
+      "history": [
+        {
+          "epoch": 1.0,
+          "loss": 1.2973460032115243
+        },
+        {
+          "epoch": 2.0,
+          "loss": 1.169282230475138
+        },
+        {
+          "epoch": 3.0,
+          "loss": 1.0928071069621388
+        },
+        {
+          "epoch": 4.0,
+          "loss": 1.0424510293404203
+        },
+        {
+          "epoch": 5.0,
+          "loss": 1.00670912933783
+        },
+        {
+          "epoch": 6.0,
+          "loss": 0.9815166971354352
+        },
+        {
+          "epoch": 7.0,
+          "loss": 0.9631688203263987
+        },
+        {
+          "epoch": 8.0,
+          "loss": 0.9496600032180662
+        }
+      ]
+    }
+  },
+  "top_features": [
+    {
+      "feature": "dataset_id_ieee_cis",
+      "weight": 0.6035569779475037
+    },
+    {
+      "feature": "dataset_id_paysim",
+      "weight": -0.44085796481541617
+    },
+    {
+      "feature": "log_amount",
+      "weight": -0.43538382862646713
+    },
+    {
+      "feature": "txn_type_IEEE_CIS_C",
+      "weight": 0.36051640738094726
+    },
+    {
+      "feature": "txn_type_CARD_TRANSACTION",
+      "weight": -0.3504016674457521
+    }
+  ],
+  "bq_validation_summary": {
+    "created_at_utc": "2026-03-04T20:34:05Z",
+    "project_id": "fraud-aml-graph",
+    "dataset_id": "fraud_aml_graph_dev",
+    "location": "EU",
+    "sql_path": "sql/bigquery/validation",
+    "result_count": 4,
+    "results": [
+      {
+        "sql_file": "sql/bigquery/validation/01_table_row_counts.sql",
+        "statement_type": "SELECT",
+        "row_count": 7,
+        "total_bytes_processed": 0,
+        "csv_file": "01_table_row_counts.csv"
+      },
+      {
+        "sql_file": "sql/bigquery/validation/02_data_quality_checks.sql",
+        "statement_type": "SELECT",
+        "row_count": 7,
+        "total_bytes_processed": 0,
+        "csv_file": "02_data_quality_checks.csv"
+      },
+      {
+        "sql_file": "sql/bigquery/validation/03_model_and_queue_quality.sql",
+        "statement_type": "SELECT",
+        "row_count": 3,
+        "total_bytes_processed": 0,
+        "csv_file": "03_model_and_queue_quality.csv"
+      },
+      {
+        "sql_file": "sql/bigquery/validation/04_queue_precision_top50.sql",
+        "statement_type": "SELECT",
+        "row_count": 88,
+        "total_bytes_processed": 163500,
+        "csv_file": "04_queue_precision_top50.csv"
+      }
+    ]
+  },
+  "bq_graph_analytics_summary": {
+    "created_at_utc": "2026-03-04T20:36:00Z",
+    "project_id": "fraud-aml-graph",
+    "dataset_id": "fraud_aml_graph_dev",
+    "location": "EU",
+    "sql_path": "sql/bigquery/graph_analytics",
+    "result_count": 2,
+    "results": [
+      {
+        "sql_file": "sql/bigquery/graph_analytics/01_create_graph_watchlist_party_top.sql",
+        "statement_type": "CREATE_TABLE_AS_SELECT",
+        "row_count": 0,
+        "total_bytes_processed": 65008874,
+        "csv_file": ""
+      },
+      {
+        "sql_file": "sql/bigquery/graph_analytics/02_create_graph_watchlist_cluster_top.sql",
+        "statement_type": "CREATE_TABLE_AS_SELECT",
+        "row_count": 0,
+        "total_bytes_processed": 15525433,
+        "csv_file": ""
+      }
+    ]
+  },
+  "core_upload_summary": {
+    "created_at_utc": "2026-02-27T14:08:14Z",
+    "project_id": "fraud-aml-graph",
+    "dataset_id": "fraud_aml_graph_dev",
+    "table_prefix": "dev_",
+    "summary": {
+      "graph_party_node": {
+        "rows_loaded": 582652
+      },
+      "graph_party_edge": {
+        "rows_loaded": 462948
+      },
+      "graph_account_node": {
+        "rows_loaded": 582652
+      },
+      "graph_account_edge": {
+        "rows_loaded": 462948
+      },
+      "graph_party_cluster_membership": {
+        "rows_loaded": 445060
+      },
+      "graph_party_cluster_summary": {
+        "rows_loaded": 134702
+      }
+    }
+  }
+}

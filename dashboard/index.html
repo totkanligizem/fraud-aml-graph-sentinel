@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fraud - AML Graph Sentinel Dashboard</title>
+    <meta name="description" content="Executive dashboard for the Fraud - AML Graph Sentinel pipeline.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero-card reveal">
+        <div class="hero-copy">
+          <div class="eyebrow-row">
+            <span class="eyebrow">Executive Risk Surface</span>
+            <span class="status-pill" id="status-pill">Validated and synchronized</span>
+          </div>
+          <h1>Fraud - AML Graph Sentinel</h1>
+          <p class="hero-text">
+            Investigation-grade fraud and AML monitoring layer with graph intelligence, verified local-to-BigQuery parity,
+            and a publish-ready executive surface.
+          </p>
+          <div class="insight-ribbon" id="insight-ribbon"></div>
+          <div class="filter-row">
+            <div class="filter-label">Lens</div>
+            <div class="dataset-switcher" id="dataset-switcher"></div>
+          </div>
+        </div>
+        <aside class="hero-side">
+          <div class="orbital-panel">
+            <div class="orbital-ring" id="assurance-ring">
+              <div class="orbital-core">
+                <div class="orbital-value" id="assurance-value">100%</div>
+                <div class="orbital-label">assurance</div>
+              </div>
+            </div>
+            <div class="orbital-meta">
+              <div>
+                <span class="meta-label">Snapshot</span>
+                <strong id="snapshot-time">-</strong>
+              </div>
+              <div>
+                <span class="meta-label">Region</span>
+                <strong id="region-text">-</strong>
+              </div>
+              <div>
+                <span class="meta-label">Theme</span>
+                <strong id="theme-text">-</strong>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </header>
+
+      <section class="signal-band reveal">
+        <article class="signal-card">
+          <span class="section-kicker">Cadence</span>
+          <h3>Refresh spine</h3>
+          <div class="signal-card-copy" id="refresh-spine"></div>
+        </article>
+        <article class="signal-card">
+          <span class="section-kicker">Operating mode</span>
+          <h3>Control posture</h3>
+          <div class="signal-card-copy" id="control-posture"></div>
+        </article>
+        <article class="signal-card">
+          <span class="section-kicker">Analyst runtime</span>
+          <h3>LLM surface</h3>
+          <div class="signal-card-copy" id="llm-surface"></div>
+        </article>
+        <article class="signal-card">
+          <span class="section-kicker">Evidence</span>
+          <h3>Publication chain</h3>
+          <div class="signal-card-copy" id="publication-chain"></div>
+        </article>
+      </section>
+
+      <main class="dashboard-grid">
+        <section class="card span-8 reveal">
+          <div class="section-head">
+            <div>
+              <span class="section-kicker">Operational pulse</span>
+              <h2>KPI strip</h2>
+            </div>
+            <p class="section-note">Each KPI is tied to validated artifacts, queue behavior and graph pressure.</p>
+          </div>
+          <div class="kpi-brief" id="kpi-brief"></div>
+          <div class="kpi-grid" id="kpi-grid"></div>
+        </section>
+
+        <section class="card span-4 reveal">
+          <div class="section-head compact">
+            <div>
+              <span class="section-kicker">Delivery progress</span>
+              <h2>Completion</h2>
+            </div>
+          </div>
+          <div class="completion-stack" id="completion-stack"></div>
+          <div class="quality-ledger" id="quality-ledger"></div>
+        </section>
+
+        <section class="card span-8 reveal">
+          <div class="section-head">
+            <div>
+              <span class="section-kicker">Time series</span>
+              <h2>Volume and incident rhythm</h2>
+            </div>
+            <p class="section-note" id="trend-note">Overview across the validated monitoring window.</p>
+          </div>
+          <div class="chart-stage">
+            <svg id="trend-chart" viewBox="0 0 920 360" role="img" aria-label="Daily volume and incident rate trend"></svg>
+          </div>
+          <div class="chart-legend">
+            <span><i class="swatch swatch-volume"></i> Transaction volume</span>
+            <span><i class="swatch swatch-fraud"></i> Fraud rate per 1k</span>
+            <span><i class="swatch swatch-aml"></i> AML count</span>
+          </div>
+          <div class="trend-summary" id="trend-summary"></div>
+        </section>
+
+        <section class="card span-4 reveal">
+          <div class="section-head compact">
+            <div>
+              <span class="section-kicker">Validation</span>
+              <h2>Zero-defect ledger</h2>
+            </div>
+          </div>
+          <div class="metric-checklist" id="metric-checklist"></div>
+        </section>
+
+        <section class="card span-7 reveal">
+          <div class="section-head">
+            <div>
+              <span class="section-kicker">Dataset matrix</span>
+              <h2>Coverage and label mix</h2>
+            </div>
+            <p class="section-note">Volume, label density and scored coverage remain aligned with the current audit snapshot.</p>
+          </div>
+          <div class="dataset-table" id="dataset-table"></div>
+        </section>
+
+        <section class="card span-5 reveal">
+          <div class="section-head">
+            <div>
+              <span class="section-kicker">Score surface</span>
+              <h2>Risk bucket distribution</h2>
+            </div>
+            <p class="section-note">Fraud score density by current lens.</p>
+          </div>
+          <div class="bucket-bars" id="bucket-bars"></div>
+          <div class="queue-highlights" id="queue-highlights"></div>
+        </section>
+
+        <section class="card span-4 reveal">
+          <div class="section-head compact">
+            <div>
+              <span class="section-kicker">Queue quality</span>
+              <h2>Ranking signal</h2>
+            </div>
+          </div>
+          <div class="stat-list" id="ranking-stats"></div>
+        </section>
+
+        <section class="card span-4 reveal">
+          <div class="section-head compact">
+            <div>
+              <span class="section-kicker">Pipeline contract</span>
+              <h2>Flow integrity</h2>
+            </div>
+          </div>
+          <div class="pipeline-list" id="pipeline-list"></div>
+        </section>
+
+        <section class="card span-4 reveal">
+          <div class="section-head compact">
+            <div>
+              <span class="section-kicker">Model behavior</span>
+              <h2>Feature pressure</h2>
+            </div>
+          </div>
+          <div class="feature-list" id="feature-list"></div>
+        </section>
+
+        <section class="card span-6 reveal">
+          <div class="section-head">
+            <div>
+              <span class="section-kicker">Graph intelligence</span>
+              <h2>Cluster watchlist</h2>
+            </div>
+            <p class="section-note">Highest-risk connected structures based on current graph thresholds.</p>
+          </div>
+          <div class="cluster-list" id="cluster-list"></div>
+        </section>
+
+        <section class="card span-6 reveal">
+          <div class="section-head">
+            <div>
+              <span class="section-kicker">Entity watchlist</span>
+              <h2>Node exposure</h2>
+            </div>
+            <p class="section-note">Party nodes ranked by graph risk score and transfer intensity.</p>
+          </div>
+          <div class="node-list" id="node-list"></div>
+        </section>
+
+        <section class="card span-12 analyst-panel reveal">
+          <div class="section-head">
+            <div>
+              <span class="section-kicker">Analyst copilot</span>
+              <h2>Gemini case surface</h2>
+            </div>
+            <p class="section-note" id="analyst-note">Latest validated Vertex analyst output rendered from the prompt-pack pipeline.</p>
+          </div>
+          <div class="analyst-meta-row" id="analyst-meta"></div>
+          <div class="analyst-cases" id="analyst-cases"></div>
+        </section>
+
+        <section class="card span-12 reveal">
+          <div class="section-head">
+            <div>
+              <span class="section-kicker">Evidence chain</span>
+              <h2>Artifacts feeding this view</h2>
+            </div>
+            <p class="section-note">Static site, live numbers. Every visible value is sourced from validated JSON or SQLite outputs.</p>
+          </div>
+          <div class="evidence-grid" id="evidence-grid"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="dashboard-data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

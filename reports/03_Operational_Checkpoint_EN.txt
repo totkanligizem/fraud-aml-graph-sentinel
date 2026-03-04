@@ -1,0 +1,83 @@
+Fraud - AML Graph Operational Checkpoint (EN)
+
+Generated at (UTC): 2026-03-04T21:01:32Z
+
+1) Executive Summary
+This checkpoint report summarizes the current working state of the local pipeline, graph layer, and BigQuery environment after the latest audit pass.
+Critical data-contract issues were fixed and both local and BigQuery validators are passing.
+Estimated completion (inference): roughly 88% of MVP scope, roughly 70% of full-vision scope.
+
+2) Completed Core Layers
+- Canonical ingestion: active
+- SQLite warehouse + feature layer: active
+- Fraud baseline scoring: active
+- Investigation queue / ranking: active
+- Graph layer: active
+- BigQuery refresh + validation: active
+- Automated checkpoint reporting: active
+
+3) Local Operational State
+- transaction_event_raw: 1,184,807
+- stg_transaction_event: 1,184,807
+- transaction_mart: 1,184,807
+- feature_payer_24h: 150,000
+- monitoring_mart: 90
+- fraud_scores: 884,807
+- alert_queue queue_count: 88
+
+4) Model and Ranking State
+- Fraud baseline AP: 0.0424
+- Fraud baseline PR-AUC(trapz): 0.0424
+- Cost-optimized threshold: 0.624862
+- Mean Precision@50: 7.45%
+- Mean NDCG@50: 7.11%
+- Queues with positive labels: 88
+Example highest-weight features:
+  - dataset_id_ieee_cis: 0.6036 (abs)
+  - dataset_id_paysim: 0.4409 (abs)
+  - log_amount: 0.4354 (abs)
+  - txn_type_IEEE_CIS_C: 0.3605 (abs)
+  - txn_type_CARD_TRANSACTION: 0.3504 (abs)
+
+5) Graph State
+- graph_party_node: 582,652
+- graph_party_edge: 462,948
+- graph_account_node: 582,652
+- graph_account_edge: 462,948
+- cluster_count: 134,702
+- suspicious_edge_count: 328,952
+
+6) BigQuery State
+- Dataset: fraud-aml-graph.fraud_aml_graph_dev (EU)
+- Core validator: PASS
+- dev_transaction_mart: 1,184,807
+- dev_fraud_scores: 884,807
+- dev_alert_queue: 884,807
+- dev_graph_party_node: 582,652
+- dev_graph_party_edge: 462,948
+
+7) Critical Issues Closed In This Checkpoint
+- source_event_id was standardized as STRING.
+- label_aml was aligned to a nullable INT contract.
+- party_id and account_id namespace separation is now enforced.
+- Namespace-collision tests were added to the graph validators.
+- Warehouse indexes were added to fix scoring performance.
+
+8) Current Quality Results
+- null_source_event_id_transaction_mart: 0
+- invalid_label_aml_transaction_mart: 0
+- shared_party_account_node_ids: 0
+- shared_party_account_edge_pairs: 0
+
+9) Remaining Work
+- Final dashboard / view layer
+- Presentation-grade KPI reporting
+- Gemini-based analyst copilot
+- Optional second-phase datasets: banksim / ibm_amlsim / elliptic
+
+10) Evidence Artifacts
+- artifacts/bigquery/validate-bigquery-state.json
+- artifacts/graph/graph-build-summary-20260227T125935Z.json
+- artifacts/models/ranking/20260227T125836Z/ranking-summary.json
+- artifacts/models/fraud_scoring/20260227T125804Z/scoring-summary.json
+- data/warehouse/warehouse-build-summary.json

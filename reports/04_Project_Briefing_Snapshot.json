@@ -1,0 +1,387 @@
+{
+  "generated_at_utc": "2026-03-04T20:58:22Z",
+  "project": {
+    "name": "Fraud - AML Graph Sentinel",
+    "topic": "Fraud detection + AML monitoring + graph intelligence + investigation queue + BigQuery analytics",
+    "scope": "Senior-level bank-tech portfolio project; canonical ingestion, local warehouse, baseline model, queueing, graph layer, BigQuery sync, reporting and dashboard.",
+    "purpose": "Birden fazla sentetik/benchmark fraud ve AML veri kaynagini ortak bir finansal risk izleme yuzeyinde birlestirmek; siralanmis inceleme kuyrugu ve graph watchlist ile investigasyon verimliligini artirmak.",
+    "goals": [
+      "Heterojen veri kaynaklarini ortak veri sozlesmesinde toplamak",
+      "Deterministik ve yeniden uretilebilir local pipeline kurmak",
+      "Fraud scoring ve investigation ranking saglamak",
+      "Graph tabanli entity ve cluster risk sinyali uretmek",
+      "BigQuery uzerinden analytics ve validator katmani kurmak",
+      "Yonetici sunumuna uygun rapor ve dashboard katmani hazirlamak"
+    ]
+  },
+  "business_questions": [
+    "Hangi transactions ve hangi queue gunleri investigasyon onceligine alinmali?",
+    "Hangi dataset veya davranis siniflari model tarafinda daha riskli gozukuyor?",
+    "Fraud sinyali ile AML sinyalini ayni risk yuzeyinde nasil birlikte izleriz?",
+    "Hangi party/account yapilari graph seviyesinde supheli cluster olusturuyor?",
+    "Local pipeline ile BigQuery analytical layer arasinda veri kaybi veya contract drift var mi?",
+    "Quality gate'ler sifir defect seviyesinde mi?"
+  ],
+  "datasets": [
+    "ieee_cis -> kart/online transaction fraud benchmark",
+    "creditcard_fraud -> labelled card fraud benchmark",
+    "paysim -> payment simulator fraud benchmark",
+    "ibm_aml_data -> synthetic AML transactions with laundering labels",
+    "banksim / ibm_amlsim / elliptic -> klasor yapisi hazir, mevcut asamada bos ve opsiyonel ikinci faz"
+  ],
+  "methodology": [
+    "Canonical schema normalization",
+    "SQLite-based reproducible warehouse",
+    "Point-in-time feature engineering",
+    "Numpy/Pandas baseline linear fraud model",
+    "Daily investigation queue ranking with P@K and NDCG@K evaluation",
+    "Graph node/edge aggregation and connected-cluster summarization",
+    "Artifact-first validation and evidence-driven reporting",
+    "BigQuery mirror plus SQL analytics/validation layer"
+  ],
+  "toolchain": {
+    "all_packages": [
+      "argparse",
+      "ast",
+      "base64",
+      "csv",
+      "dataclasses",
+      "datetime",
+      "google",
+      "json",
+      "matplotlib",
+      "numpy",
+      "os",
+      "pandas",
+      "pathlib",
+      "re",
+      "shutil",
+      "sqlite3",
+      "textwrap",
+      "time",
+      "typing",
+      "zlib"
+    ],
+    "by_file": [
+      "- bigquery_test_connection.py: google, os, pathlib",
+      "- build_analyst_casebook.py: argparse, datetime, json, pathlib, sqlite3, typing",
+      "- build_analyst_prompt_pack.py: argparse, datetime, json, pathlib, typing",
+      "- build_dashboard_bundle.py: datetime, json, pathlib, sqlite3, typing",
+      "- build_graph_layer.py: argparse, datetime, json, pathlib, sqlite3, typing",
+      "- build_investigation_queue.py: argparse, datetime, json, numpy, pandas, pathlib, sqlite3, typing",
+      "- build_sqlite_warehouse.py: argparse, datetime, json, pandas, pathlib, sqlite3, typing",
+      "- cleanup_incomplete_runs.py: argparse, dataclasses, json, pathlib, shutil, typing",
+      "- extract_pdf_text.py: argparse, base64, dataclasses, pathlib, re, typing, zlib",
+      "- generate_checkpoint_reports.py: datetime, json, matplotlib, os, pathlib, textwrap, typing",
+      "- generate_master_final_report.py: ast, csv, datetime, json, matplotlib, os, pathlib, textwrap, typing",
+      "- generate_master_final_report_en.py: datetime, json, matplotlib, os, pathlib, textwrap, typing",
+      "- generate_project_briefing_report.py: ast, datetime, json, matplotlib, os, pathlib, textwrap, typing",
+      "- ingest_canonical.py: argparse, dataclasses, datetime, json, numpy, pandas, pathlib, re, typing",
+      "- run_bigquery_sql_bundle.py: argparse, csv, datetime, google, json, os, pathlib, typing",
+      "- run_vertex_analyst_copilot.py: argparse, datetime, google, json, os, pathlib, time, typing",
+      "- score_fraud_baseline_numpy.py: argparse, datetime, json, numpy, pandas, pathlib, sqlite3, typing",
+      "- sqlite_to_bigquery.py: argparse, datetime, google, json, numpy, os, pandas, pathlib, sqlite3, typing",
+      "- train_fraud_baseline_numpy.py: argparse, csv, dataclasses, datetime, json, numpy, pandas, pathlib, shutil, sqlite3, typing",
+      "- validate_analyst_casebook.py: argparse, json, pathlib, typing",
+      "- validate_analyst_prompt_pack.py: argparse, json, pathlib, typing",
+      "- validate_analyst_sql_bundle.py: datetime, json, pathlib, re, typing",
+      "- validate_bigquery_state.py: argparse, datetime, google, json, os, pathlib, typing",
+      "- validate_dashboard_bundle.py: datetime, json, pathlib, re, typing",
+      "- validate_executive_sql_bundle.py: datetime, json, pathlib, re, typing",
+      "- validate_graph_state.py: argparse, json, pathlib, sqlite3, typing",
+      "- validate_pipeline_state.py: argparse, json, pathlib, sqlite3, typing",
+      "- validate_vertex_analyst_outputs.py: argparse, json, pathlib, typing",
+      "- vertex_outputs_to_bigquery.py: argparse, datetime, google, json, os, pathlib, typing"
+    ]
+  },
+  "current_state": {
+    "warehouse_counts": {
+      "transaction_event_raw": 1184807,
+      "stg_transaction_event": 1184807,
+      "transaction_mart": 1184807,
+      "feature_payer_24h": 150000,
+      "monitoring_mart": 90
+    },
+    "scored_rows": {
+      "ieee_cis": 300000,
+      "creditcard_fraud": 284807,
+      "paysim": 300000
+    },
+    "ranking": {
+      "created_at_utc": "2026-02-27T12:58:36Z",
+      "db_path": "data/warehouse/ledger_sentinel.db",
+      "top_k": 50,
+      "queue_count": 88,
+      "mean_precision_at_k": 0.07454545454545455,
+      "mean_ndcg_at_k": 0.07110223393672412,
+      "median_precision_at_k": 0.05,
+      "median_ndcg_at_k": 0.04950777378008861,
+      "queues_with_positive_labels": 88
+    },
+    "graph_counts": {
+      "graph_party_node": 582652,
+      "graph_party_edge": 462948,
+      "graph_account_node": 582652,
+      "graph_account_edge": 462948,
+      "graph_party_cluster_membership": 445060,
+      "graph_party_cluster_summary": 134702
+    },
+    "graph_cluster_summary": {
+      "cluster_count": 134702,
+      "cluster_membership_rows": 445060,
+      "suspicious_edge_count": 328952
+    },
+    "bigquery_counts": {
+      "dev_transaction_mart": 1184807,
+      "dev_feature_payer_24h": 150000,
+      "dev_monitoring_mart": 90,
+      "dev_fraud_scores": 884807,
+      "dev_alert_queue": 884807,
+      "dev_alert_queue_top50": 4400,
+      "dev_risk_dashboard_daily": 90,
+      "dev_graph_party_node": 582652,
+      "dev_graph_party_edge": 462948,
+      "dev_graph_account_node": 582652,
+      "dev_graph_account_edge": 462948,
+      "dev_graph_party_cluster_membership": 445060,
+      "dev_graph_party_cluster_summary": 134702
+    },
+    "quality_metrics": {
+      "null_event_id_transaction_mart": 0,
+      "null_source_event_id_transaction_mart": 0,
+      "duplicate_event_id_transaction_mart": 0,
+      "invalid_fraud_score_range": 0,
+      "invalid_alert_queue_rank": 0,
+      "missing_alert_queue_id": 0,
+      "invalid_label_aml_transaction_mart": 0
+    },
+    "graph_quality_metrics": {
+      "null_graph_party_node_id": 0,
+      "duplicate_graph_party_node_id": 0,
+      "invalid_graph_party_edge_risk_score": 0,
+      "cluster_membership_without_summary": 0,
+      "shared_party_account_node_ids": 0,
+      "shared_party_account_edge_pairs": 0
+    },
+    "model_metrics": {
+      "average_precision": 0.04240917825737341,
+      "pr_auc_trapz": 0.04237270148500237
+    },
+    "cost_threshold": {
+      "threshold": 0.6248615207700052,
+      "cost": 171001.0,
+      "tp": 7090.0,
+      "fp": 169701.0,
+      "tn": 119.0,
+      "fn": 52.0,
+      "precision": 0.04010385144040138,
+      "recall": 0.9927191262951555
+    },
+    "dashboard_completion": {
+      "mvp": 88,
+      "vision": 70
+    },
+    "analyst": {
+      "available": true,
+      "status": "validated",
+      "note": "Latest validated Gemini analyst smoke output rendered into the executive dashboard.",
+      "created_at_utc": "2026-03-04T20:32:33Z",
+      "model": "gemini-2.5-flash",
+      "location": "europe-west4",
+      "response_count": 3,
+      "error_count": 0,
+      "responses": [
+        {
+          "queue_id": "creditcard_fraud|2013-09-01",
+          "dataset_id": "creditcard_fraud",
+          "model": "gemini-2.5-flash",
+          "overall_priority": "high",
+          "runtime_error": "",
+          "validation_errors": [],
+          "response_chars": 2881,
+          "case_overview": "This case involves a credit card fraud queue for 2013-09-01, containing 144,786 transactions with an average fraud score of 0.27. The queue includes 281 positively labeled fraud events. The top-ranked events, all scoring 0.383, include one confirmed fraud transaction (creditcard_fraud-542) and several other transactions with zero amounts.",
+          "observed_signals": [
+            "Queue ID: creditcard_fraud|2013-09-01",
+            "Event Date: 2013-09-01",
+            "Queue contains 144,786 rows with an average fraud score of 0.2738.",
+            "Maximum fraud score in the queue is 0.3832."
+          ],
+          "recommended_actions": [
+            "Investigate event 'creditcard_fraud-542' and other top-scoring zero-amount transactions for commonalities (e.g., card numbers, merchants, timestamps).",
+            "Retrieve full transaction details for the top 8 events, including associated card numbers, merchant IDs, and any available geo-location or device information.",
+            "Analyze the nature of the zero-amount transactions to determine if they are authorization attempts, system tests, or a specific fraud vector."
+          ],
+          "evidence_gaps": [
+            "Missing details on payer/payee parties and accounts for all transactions.",
+            "Missing merchant category code (MCC), geo-location, device ID, IP prefix, and email domain for all transactions.",
+            "Lack of context for the 0.0 EUR transaction amounts (e.g., authorization attempts, refunds, data errors)."
+          ],
+          "raw_file": "creditcard_fraud__2013-09-01.raw.txt",
+          "output_file": "creditcard_fraud__2013-09-01.json"
+        },
+        {
+          "queue_id": "ieee_cis|2017-12-04",
+          "dataset_id": "ieee_cis",
+          "model": "gemini-2.5-flash+deterministic_fallback",
+          "overall_priority": "high",
+          "runtime_error": "",
+          "validation_errors": [],
+          "response_chars": 109,
+          "case_overview": "Queue ieee_cis|2017-12-04 from ieee_cis on 2017-12-04 contains 3241 events with average score 0.803 and peak score 0.877. Current signal mix indicates high investigation priority.",
+          "observed_signals": [
+            "Queue ieee_cis|2017-12-04 (ieee_cis, 2017-12-04) has 3241 events.",
+            "Average fraud score 0.803, max fraud score 0.877.",
+            "Observed positive fraud labels: 92; AML labels: 0.",
+            "Top ranked event ieee_cis-2995907 scored 0.877."
+          ],
+          "recommended_actions": [
+            "Review top-ranked events with full transaction lineage and linked accounts.",
+            "Prioritize parties with repeated high-risk signals for enhanced due diligence.",
+            "Run temporal and counterparty concentration checks for potential structuring patterns."
+          ],
+          "evidence_gaps": [
+            "Beneficial ownership and customer KYC context are not included in the case packet.",
+            "External sanctions/adverse media enrichments are not present in this run."
+          ],
+          "raw_file": "ieee_cis__2017-12-04.raw.txt",
+          "output_file": "ieee_cis__2017-12-04.json"
+        },
+        {
+          "queue_id": "paysim|2017-01-01",
+          "dataset_id": "paysim",
+          "model": "gemini-2.5-flash+deterministic_fallback",
+          "overall_priority": "medium",
+          "runtime_error": "",
+          "validation_errors": [],
+          "response_chars": 97,
+          "case_overview": "Queue paysim|2017-01-01 from paysim on 2017-01-01 contains 300000 events with average score 0.215 and peak score 0.501. Current signal mix indicates medium investigation priority.",
+          "observed_signals": [
+            "Queue paysim|2017-01-01 (paysim, 2017-01-01) has 300000 events.",
+            "Average fraud score 0.215, max fraud score 0.501.",
+            "Observed positive fraud labels: 181; AML labels: 0.",
+            "Top ranked event paysim-63851 scored 0.501."
+          ],
+          "recommended_actions": [
+            "Review top-ranked events with full transaction lineage and linked accounts.",
+            "Prioritize parties with repeated high-risk signals for enhanced due diligence.",
+            "Run temporal and counterparty concentration checks for potential structuring patterns."
+          ],
+          "evidence_gaps": [
+            "Beneficial ownership and customer KYC context are not included in the case packet.",
+            "External sanctions/adverse media enrichments are not present in this run."
+          ],
+          "raw_file": "paysim__2017-01-01.raw.txt",
+          "output_file": "paysim__2017-01-01.json"
+        }
+      ]
+    }
+  },
+  "completed_work": [
+    "Dataset layout and manual download verification",
+    "Canonical ingestion pipeline for four active datasets",
+    "Warehouse build with transaction mart, feature mart and monitoring mart",
+    "Fraud baseline training, scoring and ranking pipeline",
+    "Graph node/edge and cluster layer",
+    "BigQuery connection, full sync, analytics SQL and validation SQL",
+    "Vertex AI groundwork: region, service account, bucket",
+    "TR/EN operational checkpoint reports",
+    "Static executive dashboard bundle seeded from validated artifacts",
+    "Dashboard QA validator and evidence metadata layer",
+    "Vertex AI + Gemini live smoke path validated and latest analyst output surfaced into the dashboard"
+  ],
+  "critical_fixes_applied": [
+    "source_event_id type drift kapatildi ve STRING/TEXT standardize edildi",
+    "label_aml mixed-type problemi kapatildi ve nullable INT sozlesmesine cekildi",
+    "party_id / account_id namespace collision giderildi",
+    "Graph validators ile namespace clash fail condition haline getirildi",
+    "Warehouse scoring path icin kritik indexler eklendi",
+    "Yarim kalan IBM run artiklari temizlendi; mevcut candidate_count=0",
+    "Dashboard tarafinda no-score lens (IBM) icin sahte overview fallback kaldirildi",
+    "Dashboard tarafinda amount alanlari icin gereksiz USD iddiasi kaldirildi; sayisal magnitude sunumu kullanildi",
+    "Dashboard icin publish-breaking drift, missing artifact ve DOM binding validator eklendi",
+    "Vertex analyst runtime icin cloud-platform scope eklendi; invalid_scope hatasi kapatildi",
+    "Vertex structured output icin JSON schema, retry ve quota-light smoke politikasi eklendi"
+  ],
+  "importance_map": [
+    "transaction_mart veri sozlesmesi projenin en kritik omurgasi; upstream/downstream her sey buraya bagli",
+    "validate_pipeline_state.py ve validate_graph_state.py kalite kapilari regressions yakalamak icin kritik",
+    "alert_queue ve ranking metrics business value'nin cekirdegi; investigasyon etkisini bunlar olcuyor",
+    "graph_party_cluster_summary supheli topluluklarin executive anlatimi icin en yuksek onemli graph ciktisi",
+    "validate_bigquery_state artifact'i local ile analytical layer parity kanitidir",
+    "checkpoint snapshot ve dashboard bundle publish edilen sayilarin denetlenebilir olmasini saglar",
+    "Vertex analyst smoke artifact'i LLM katmaninin deterministic prompt-contract ile calistiginin kanitidir"
+  ],
+  "risks_and_pitfalls": [
+    "Ayni sayfada fraud ve AML sinyalini gostermek kolayca semantik karisiklik yaratir; label source alanlari net ayrilmali",
+    "Amount alanlari kaynak para birimi bazli olabilir; normalized currency iddiasi ancak fx donusumu ile acikca yapilmali",
+    "IBM AML veri hacmi buyuk; uncapped ingest disk ve zaman maliyeti yaratir",
+    "Dashboard tarafinda no-score datasetler icin sahte fallback gosterimi karar yanlisi uretir",
+    "BigQuery tarafinda remote revalidation sansli ortam gerektirir; artifact timestamp'i izlenmeli",
+    "Namespace ayrimi bozulursa graph node ve edge anlamini kaybeder; validatorlar bypass edilmemeli",
+    "Feature engineering pencereleri point-in-time kurallarina bagli; leakage riski kritik",
+    "Queue metrics yuksek gorunse bile class imbalance nedeniyle threshold ve business cost birlikte okunmali",
+    "Vertex free-trial veya dusuk quota ortaminda ard arda multi-prompt smoke 429 uretebilir; smoke testi bilincli olarak kucuk tutulmali"
+  ],
+  "next_opportunities": [
+    "Dashboard'i tarayicida calisip son mile polish ve responsive ince ayar yapmak",
+    "Looker Studio veya benzeri paylasim katmani ile BigQuery view uzerinden canli executive board kurmak",
+    "Gemini/Vertex AI analyst copilotu tek queue smoke'tan coklu queue batch ve dashboard drilldown seviyesine cikarmak",
+    "opsiyonel ikinci faz datasetleri ekleyip karsilastirmali modelleme yapmak",
+    "CI seviyesinde lokal smoke validation zinciri eklemek",
+    "Model explainability ve error analysis katmanini zenginlestirmek"
+  ],
+  "flow_ascii": [
+    "data/raw/* datasets",
+    "  -> ingest_canonical.py",
+    "  -> data/curated/transaction_event",
+    "  -> build_sqlite_warehouse.py",
+    "  -> transaction_event_raw / stg_transaction_event / transaction_mart",
+    "  -> feature_payer_24h + monitoring_mart",
+    "  -> train_fraud_baseline_numpy.py",
+    "  -> fraud baseline model",
+    "  -> score_fraud_baseline_numpy.py",
+    "  -> fraud_scores",
+    "  -> build_investigation_queue.py",
+    "  -> alert_queue",
+    "  -> build_graph_layer.py",
+    "  -> graph_* tables",
+    "  -> sqlite_to_bigquery.py",
+    "  -> BigQuery dev_* tables",
+    "  -> run_bigquery_sql_bundle.py (analytics + validation)",
+    "  -> validate_bigquery_state.py",
+    "  -> generate_checkpoint_reports.py",
+    "  -> build_dashboard_bundle.py",
+    "  -> reports + dashboard"
+  ],
+  "flow_mermaid": "```mermaid\nflowchart TD\n    A[Manual datasets in data/raw] --> B[ingest_canonical.py]\n    B --> C[transaction_event_raw]\n    C --> D[build_sqlite_warehouse.py]\n    D --> E[stg_transaction_event]\n    E --> F[transaction_mart]\n    F --> G[feature_payer_24h]\n    F --> H[monitoring_mart]\n    F --> I[train_fraud_baseline_numpy.py]\n    I --> J[fraud baseline model]\n    J --> K[score_fraud_baseline_numpy.py]\n    K --> L[fraud_scores]\n    L --> M[build_investigation_queue.py]\n    M --> N[alert_queue]\n    F --> O[build_graph_layer.py]\n    L --> O\n    N --> O\n    O --> P[graph nodes and edges]\n    F --> Q[sqlite_to_bigquery.py]\n    G --> Q\n    H --> Q\n    L --> Q\n    N --> Q\n    P --> Q\n    Q --> R[BigQuery dev tables]\n    R --> S[Analytics SQL bundles]\n    R --> T[Validation SQL bundles]\n    F --> U[generate_checkpoint_reports.py]\n    R --> U\n    U --> V[checkpoint pdf/txt/json]\n    U --> W[build_dashboard_bundle.py]\n    W --> X[static dashboard bundle]\n```",
+  "rerun_audit": {
+    "audit_rerun_utc": "2026-03-04T20:58:22Z",
+    "local_checks": [
+      "python3 -m compileall -q scripts -> PASS",
+      "make check-datasets -> PASS",
+      "python3 scripts/cleanup_incomplete_runs.py -> candidate_count=0",
+      "make validate-state -> PASS",
+      "make graph-validate -> PASS",
+      "PRAGMA integrity_check -> ok",
+      "PRAGMA quick_check -> ok",
+      "python3 scripts/build_dashboard_bundle.py -> PASS",
+      "python3 scripts/validate_dashboard_bundle.py -> PASS",
+      "make agent-vertex-validate -> PASS"
+    ],
+    "bigquery_revalidation": "Local sandbox icinde yeniden validate denemesi cevap donmedi; bu nedenle remote durum icin 2026-02-27T14:24:44Z tarihli son PASS artifact baz alindi."
+  },
+  "evidence": [
+    "reports/03_Operational_Checkpoint_Snapshot.json",
+    "reports/03_Operational_Checkpoint_TR.pdf",
+    "artifacts/bigquery/validate-bigquery-state.json",
+    "artifacts/bigquery/validate-executive-sql-bundle.json",
+    "artifacts/dashboard/validate-dashboard-state.json",
+    "artifacts/graph/graph-build-summary-20260227T125935Z.json",
+    "artifacts/models/ranking/20260227T125836Z/ranking-summary.json",
+    "artifacts/models/fraud_scoring/20260227T125804Z/scoring-summary.json",
+    "artifacts/agent/casebook/latest/casebook.json",
+    "artifacts/agent/prompt_pack/latest/prompt-pack-summary.json",
+    "artifacts/agent/vertex_responses/latest/run-summary.json",
+    "data/warehouse/warehouse-build-summary.json"
+  ]
+}

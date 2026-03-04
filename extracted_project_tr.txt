@@ -1,0 +1,226 @@
+=== PAGE 1 ===
+Sayfa 1
+
+Fraud & AML Graph Sentinel: Kapsamlı Risk
+
+Analizi ve Veri Sızıntısı (Data Leakage) Önleme
+
+Mimarisi Raporu
+
+BÖLÜM 1: Projedeki Temel Riskler ve Olumsuz Yönler
+
+Bu proje, bankacılık standartlarına uygun bir makine öğrenimi portföyü sunmayı
+
+hedeflese de, sistemin doğası gereği dikkatle yönetilmesi gereken yapısal ve
+
+operasyonel riskler barındırmaktadır.
+
+1.1. Veri ve Veri Boru Hattı (Pipeline) Riskleri
+
+Veri Sızıntısı (Leakage): Zaman özellikleri (time features) üzerinden sızıntı olması
+
+yüksek seviyeli bir risktir. Zaman içinde doğru noktalarda birleştirme (point-in-time
+
+joins) yapılmazsa, model eğitiminde geleceğe dair veriler geçmişteymiş gibi
+
+kullanılabilir. Bu durum, modelin gerçek dünyada başarısız olmasına yol açar.
+
+Veri Seti Lisans İhlalleri: Gerçek banka işlem verileri özel ve gizli olduğundan, proje
+
+sentetik veya kamuya açık veri setleri kullanmaktadır. Veri seti lisanslarının yanlış
+
+kullanımı yüksek bir risktir; örneğin IBM AML-Data verisi için veri lisansı
+
+(CDLA-Sharing-1.0) ile depo lisansı (Apache-2.0) arasında açık bir ayrım
+
+bulunmaktadır. Verilerin doğrudan GitHub gibi ortamlara yüklenmesi (commit
+
+edilmesi) kesinlikle engellenmelidir.
+
+1.2. Makine Öğrenimi ve Model Performansı Riskleri
+
+Sınıf Dengesizliği ve Sahte Güven: Dolandırıcılık verilerindeki aşırı sınıf dengesizliği
+
+(class imbalance), modelin performansı hakkında sahte bir güven oluşturabilir. Bu riski
+
+azaltmak için ROC eğrilerine temkinli yaklaşılmalı ve PR-AUC (Hassasiyet-Duyarlılık
+
+Eğrisi Altındaki Alan) veya Ortalama Hassasiyet (AP) metrikleri raporlanmalıdır.
+
+Model ve Veri Kayması (Drift): Üretim ortamında modelin performansının veya verinin
+
+dağılımının zamanla değişmesi yüksek bir risktir. Özellik grupları bazında Nüfus
+
+Kararlılık İndeksi (PSI) ve Kolmogorov-Smirnov (KS) testleri hesaplanarak sapmalar
+
+izlenmeli ve eşik değerler aşıldığında alarmlar üretilmelidir.
+
+Araştırmacı Aşırı Yükü: Modelin çok fazla yanlış pozitif (false positive) üretmesi,
+
+soruşturma ekiplerini aşırı yükleyebilir. Soruşturma kuyruğunun verimini (throughput)
+
+optimize etmek için LambdaRank gibi bir sıralama (ranking) algoritması eklenmeli ve
+
+alarm hacmi sürekli izlenmelidir.
+
+1.3. Üretken Yapay Zeka (GenAI) ve Güvenlik Riskleri
+
+İstem Enjeksiyonu (Prompt Injection) ve İfşa: Analist asistanı (Copilot), istem
+
+enjeksiyonu ve hassas bilgilerin ifşa edilmesi gibi yüksek riskler taşır. OWASP Top 10
+
+önlemleri alınmalı, güvenlik ajanı aracılığıyla veriler sansürlenmeli (redaction) ve
+
+yalnızca kanıta dayalı (grounded-only) yanıtlar verilmelidir.
+
+Aşırı Otomasyon: Sistem asistanının geri döndürülemez eylemler yapması (excessive
+
+agency) riski orta seviyelidir. Asistan yalnızca vaka notları taslakları hazırlamalı,
+
+eylemleri gerçekleştirmemeli ve her zaman insan onayına (human-in-the-loop) tabi
+
+olmalıdır.
+
+Denetim Yetersizliği: Kararların geriye dönük incelenememesi durumuna karşı, model
+
+versiyonları ve skorlar için değiştirilemez denetim günlükleri (immutable audit logs)
+
+tutulmalıdır.
+
+=== PAGE 2 ===
+Sayfa 2
+
+BÖLÜM 2: Derinlemesine Analiz - dbt ve SQL ile Veri Sızıntısını
+
+(Data Leakage) Önleme Mimarisi
+
+Makine öğreniminde "Veri Sızıntısı" (Data Leakage), modelin tahmin yaparken
+
+gerçekte o an (üretim anında) bilmemesi gereken gelecekteki bilgilere erişmesi
+
+durumudur. Finansal veri modellerinde, modelin başarısını kağıt üzerinde %99'a
+
+çıkarıp gerçek hayatta çökmesine neden olan en büyük mimari hata budur. Bu projenin
+
+en güçlü yönlerinden biri, bu sızıntıyı "Zaman İçinde Doğruluk" (Point-in-Time
+
+Correctness) prensibiyle çözmesidir.
+
+2.1. "Zaman İçinde Doğru" (Point-in-Time) Birleştirme Nedir?
+
+Geleneksel bir SQL JOIN işleminde geçmiş işlemleri toplarken hedeflenen olayın
+
+sonrasındaki işlemler yanlışlıkla hesaba katılabilir. Feast gibi özellik depoları (feature
+
+stores), bu işlemi geriye dönük taramalarla otomatik ve güvenli bir şekilde yapar.
+
+Ancak Feast kullanılmadığı senaryolarda bu güvenlik duvarı, analitik veri ambarında
+
+(örneğin BigQuery üzerinde) doğrudan SQL ve dbt katmanında inşa edilmelidir.
+
+2.2. SQL AS-OF Join Tasarım Deseni
+
+Veri sızıntısını önlemek için oluşturulacak özellik tabloları (feature tables), temel bir
+
+transaction_mart üzerinden tam olarak olay anından hemen öncesini kesecek şekilde
+
+filtrelenmelidir. Belgede sunulan şu mimari, bu mantığın temelini oluşturur:
+
+Belirli bir taraf (payer_party_id) için son 24 saatlik işlem hacmini hesaplarken, sistemin
+
+sadece o spesifik hedef olayın zamanından kesinlikle daha önce gerçekleşmiş kayıtları
+
+okuması garanti altına alınmalıdır.
+
+WITH base AS (
+
+    SELECT
+
+        e.event_id,
+
+        e.event_time,
+
+        e.payer_party_id
+
+    FROM transaction_mart e
+
+),
+
+hist AS (
+
+    SELECT
+
+        b.event_id,
+
+        COUNT(*) AS payer_txn_count_24h,
+
+        SUM(h.amount) AS payer_amt_sum_24h
+
+    FROM base b
+
+    JOIN transaction_mart h
+
+        ON h.payer_party_id = b.payer_party_id
+
+        -- Kritik Güvenlik Kuralı 1: Geleceği Görmeyi Engelle (Sızıntı Önleme)
+
+        AND h.event_time < b.event_time
+
+        -- Kritik Güvenlik Kuralı 2: Zaman Penceresini Belirle
+
+        AND h.event_time >= TIMESTAMP_SUB(b.event_time, INTERVAL 24 HOUR)
+
+    GROUP BY 1
+
+)
+
+SELECT
+
+    b.*,
+
+    COALESCE(h.payer_txn_count_24h, 0) AS payer_txn_count_24h,
+
+    COALESCE(h.payer_amt_sum_24h, 0.0) AS payer_amt_sum_24h
+
+FROM base b
+
+LEFT JOIN hist h USING (event_id);
+
+Yukarıdaki SQL yapısında h.event_time < b.event_time şartı, veri sızıntısını engelleyen
+
+anahtardır. TIMESTAMP_SUB fonksiyonu ise analizi 24 saatlik pencereye sıkıştırır.
+
+=== PAGE 3 ===
+Sayfa 3
+
+2.3. dbt (Data Build Tool) ile Otomatik Sızıntı Testleri
+
+SQL ile yazılan kuralların insan hatasına kurban gitmemesi için CI/CD süreçlerinde
+
+sızıntı testleri otomatikleştirilmelidir. Proje dbt'yi merkezine almaktadır ve bu
+
+katmanda şu testler çalıştırılmalıdır:
+
+Özel Sızıntı Testleri (Leakage Tests): Özellik (feature) tabloları oluşturulurken, eğitim
+
+satırlarında (training rows) hedef olayın zaman damgasından daha ileri bir tarihe sahip
+
+hiçbir verinin bulunmadığı birim testleri (unit test) ile doğrulanmalıdır.
+
+Temel Veri Kalitesi: transaction_mart gibi temel dbt modellerinde event_id ve
+
+event_time gibi alanların benzersiz (unique) ve boş olmaması (not_null) test
+
+edilmelidir.
+
+Kabul Edilme Kriteri (Acceptance Signal): dbt testleri sonucunda kritik testler için "0
+
+başarısız satır" (0 failing rows) hedeflenmeli ve boru hattı ancak bu şekilde çalışmasına
+
+devam etmelidir.
+
+Bu yapı, model eğitimi için çekilen verinin her zaman "zaman makinesinde o ana
+
+gidilmiş" kadar izole ve gerçeğe uygun olmasını sağlayarak projeyi standart bir
+
+akademik deneyden çıkarıp üretime hazır (production-ready) bir formata taşır.

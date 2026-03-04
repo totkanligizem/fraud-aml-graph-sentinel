@@ -1,0 +1,1340 @@
+=== PAGE 1 ===
+Fraud & AML Graph Sentinel — Senior-Level Bank-
+Tech Portfolio Project
+Executive summary
+This document turns your prior proposal (“Fraud & AML Graph Sentinel”) into an implementation-ready,
+production-style GitHub project that aligns with what bank technology teams expect: governed data
+modeling, point‑in‑time correct features, imbalanced learning, graph-based AML patterning, investigation
+queue ranking, monitoring, and an audit-safe GenAI copilot. The project is intentionally “portfolio‑safe”: it
+uses public, anonymized, and synthetic datasets because real bank transaction data is private, a constraint
+explicitly noted in the PaySim research motivation. 
+Two uploaded inputs strongly shape the design:
+Your CV
+ shows an unusually relevant spine for this exact project: 
+dbt + BigQuery
+, Looker Studio
+dashboards, Learning‑to‑Rank with 
+LightGBM LambdaRank
+, PR/Ranking metrics (Recall@K,
+NDCG@K), 
+Grounded RAG + “Sentinel cockpit”
+, drift checks via 
+PSI/KS
+, and production tooling
+(Docker, FastAPI, MLflow, Airflow/Prefect). (CV PDF, p. 2)
+The prior assistant blueprint
+ already set the correct senior “trick”: define a canonical 
+transaction_event
+ schema and write dataset adapters so the same pipeline works across
+heterogeneous sources. (Blueprint PDF, p. 3)
+Assumptions (because they were unspecified and you asked for no clarifying questions): - Cloud is 
+not fixed
+→
+ recommend 
+BigQuery
+ as the “bank-like” default plus a local stack (DuckDB/Postgres) for reproducibility. -
+Time/budget are 
+not fixed
+ 
+→
+ provide a milestone plan assuming ~6–10 weeks part‑time or ~3–5 weeks
+full‑time. - You will 
+not
+ commit raw datasets to GitHub; only scripts + small synthetic samples + schema
+files.
+Source-file analysis and hiring alignment
+Your CV demonstrates the exact capabilities this project should “prove” end-to-end:
+You already position yourself around 
+ranking systems
+ and 
+GenAI operationalization
+. The CV includes a
+basket recommendation system using 
+Learning‑to‑Rank (LightGBM LambdaRank)
+ and evaluation with
+Recall@K and NDCG@K
+, plus “production‑style ranking and serving.” (CV PDF, p. 2) This directly maps to
+fraud investigation queue ranking
+, which is often the real bottleneck in fraud operations (analyst
+throughput, not model score alone).
+Your CV also states you built an “analytics + AI platform” that combines BigQuery ML predictions with
+grounded RAG
+ and a “Sentinel action assistant,” and you already do 
+drift monitoring via PSI/KS
+. (CV PDF,
+p. 2) This is a rare and high-signal portfolio pattern for bank-tech roles, because it connects modeling to
+controls and operations rather than stopping at a notebook.
+1
+• 
+• 
+1
+
+=== PAGE 2 ===
+The prior blueprint emphasizes the same senior expectation: use 
+public/synthetic data
+, be 
+license-aware
+,
+build a 
+warehouse-style dbt layer
+, and make features 
+point‑in‑time correct
+ via canonical schema +
+adapters. (Blueprint PDF, pp. 2–3)
+The Turkish strategy document reinforces an advanced trajectory: banks increasingly value graph reasoning
+(GNNs) and agentic RAG patterns, not just classical modeling. (FinTech portfolio strategy PDF, p. 2)
+Data foundation: datasets, licensing, canonical schema, mapping
+Dataset inventory and “portfolio-safe” sourcing
+The dataset stack below covers (a) tabular fraud, (b) synthetic “bank-like” transaction flows, and (c) AML
+graphs / typologies.
+Dataset
+Primary use
+Key facts for this project
+IEEE‑CIS Fraud
+Detection (Kaggle
+competition)
+Realistic
+e‑commerce
+fraud
+classification
+Widely used benchmark; the “Fraud Dataset Benchmark”
+repo notes it is card-not-present fraud, provided by 
+Vesta
+Corporation
+, and the benchmark uses 
+590,540
+ training
+transactions with ~
+3.5%
+ fraud rate (license governed by
+competition rules). 
+Credit Card Fraud
+Detection (Worldline
++ ULB)
+Extreme class
+imbalance
+baseline
+2 days in Sept 2013; 
+492 fraud
+ out of 
+284,807
+ transactions
+(0.172%). License listed as 
+DbCL v1.0
+ on this open record. 
+PaySim simulator +
+PaySim1 public
+sample
+Mobile money /
+transfer-like
+fraud
+PaySim is a simulator created because private financial
+transaction data is rarely public. PaySim codebase license
+is 
+GPL‑3.0
+. 
+ One public PaySim1 log file is shown as 
+6,362,620 rows
+ with columns like 
+step
+, 
+type
+, 
+amount
+, 
+nameOrig
+, 
+nameDest
+, 
+isFraud
+. 
+BankSim paper
+(agent-based bank
+payments)
+Synthetic card/
+payment fraud
+BankSim paper reports generating 
+594,643
+ records
+(587,443 normal, 7,200 fraud) and describes the CSV
+output fields (step, customer id, merchant, category,
+amount, fraud flag). 
+IBM AML‑Data
+(synthetic labeled
+laundering)
+Supervised AML
+baseline + alert
+generation
+IBM states data is synthetic (multi-agent virtual world),
+contains a laundering tag, and notes: repo is Apache‑2.0
+but 
+data is CDLA‑Sharing‑1.0
+. 
+IBM AMLSim
+(synthetic AML
+transaction graphs +
+known patterns)
+AML typologies +
+ring detection
+AMLSim is intended to generate synthetic banking
+transaction data with known money laundering patterns
+for ML/graph algorithms; licensed Apache‑2.0. 
+Elliptic Data Set
+paper (Bitcoin AML)
+Time-series
+transaction
+graph ML
+Paper describes a time series graph with 
+200K+
+transactions, 
+234K
+ directed flows, and 
+166
+ node features,
+and frames illicit classification as AML. 
+2
+3
+4
+5
+6
+7
+8
+9
+2
+
+=== PAGE 3 ===
+Direct download links (copy/paste) — verify licenses/terms on the hosted pages: 
+IEEE-CIS Fraud Detection (Kaggle competition)
+https://www.kaggle.com/competitions/ieee-fraud-detection
+Credit Card Fraud Detection (Kaggle)
+https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud
+(Open record mirror)
+https://berd-platform.de/records/qcqqe-g6q16
+PaySim (simulator source; GPL-3.0)
+https://github.com/EdgarLopezPhD/PaySim
+PaySim1 sample (Kaggle)
+https://www.kaggle.com/datasets/ealaxi/paysim1
+BankSim paper
+https://www.researchgate.net/publication/
+265736405_BankSim_A_Bank_Payment_Simulation_for_Fraud_Detection_Research
+BankSim1 sample (Kaggle)
+https://www.kaggle.com/datasets/ealaxi/banksim1
+IBM AML-Data
+https://github.com/IBM/AML-Data
+IBM AMLSim
+https://github.com/IBM/AMLSim
+Elliptic paper
+https://arxiv.org/abs/1908.02591
+Elliptic dataset (Kaggle)
+https://www.kaggle.com/datasets/ellipticco/elliptic-data-set
+Canonical 
+transaction_event
+ schema
+A senior bank-tech portfolio should not be “dataset-shaped.” It should be “platform-shaped.” The canonical
+schema below makes every dataset look like a bank event stream, even if many fields are null for simpler
+datasets (exactly the approach recommended in your blueprint). (Blueprint PDF, p. 3)
+Canonical table: 
+transaction_event
+ (fact-level)
+Field group
+Examples (key fields)
+Notes
+Identity
+event_id
+, 
+source_event_id
+, 
+dataset_id
+, 
+ingested_at
+event_id
+ is internal UUID; 
+source_event_id
+ preserves dataset key
+(e.g., TransactionID).
+3
+
+=== PAGE 4 ===
+Field group
+Examples (key fields)
+Notes
+Time
+event_time
+, 
+event_time_grain
+, 
+time_step
+Use true timestamps when available;
+otherwise encode simulator steps
+(
+time_step
+) with a base date.
+Parties
+payer_party_id
+, 
+payee_party_id
+, 
+payer_account_id
+, 
+payee_account_id
+For datasets without accounts, create
+stable synthetic IDs (hashing or
+deterministic mapping).
+Channel &
+type
+channel
+, 
+txn_type
+, 
+mcc/
+category
+Normalize to enums: 
+CARD
+, 
+ECOMMERCE
+,
+TRANSFER
+, 
+CASH_OUT
+, etc.
+Monetary
+amount
+, 
+currency
+, 
+fx_rate_to_usd
+Some datasets are USD-like; keep currency
+nullable but present.
+Device /
+network
+device_id
+, 
+ip_prefix
+, 
+email_domain
+, 
+geo
+IEEE‑CIS has device/email-domain-like
+fields; many others won’t. 
+Labels
+label_fraud
+, 
+label_aml
+, 
+label_source
+AML‑Data supplies laundering tag;
+BankSim and PaySim supply fraud flags. 
+Governance
+pii_class
+, 
+consent_class
+, 
+retention_class
+Even on synthetic data, show bank-style
+governance annotations.
+Dataset adapter mapping notes
+You will implement 
+adapters/<dataset>/to_transaction_event.py
+ so every dataset lands in the
+canonical schema.
+Key mappings (high-level): - 
+PaySim
+: 
+nameOrig 
+→
+ payer_party_id
+, 
+nameDest 
+→
+ payee_party_id
+, 
+step 
+→
+ time_step
+, 
+type 
+→
+ txn_type
+, 
+isFraud 
+→
+ label_fraud
+. 
+ - 
+BankSim
+: 
+CustomerId 
+→
+ payer_party_id
+, 
+merchant 
+→
+ payee_party_id
+, 
+Step 
+→
+ time_step
+, 
+category 
+→
+ mcc/category
+, 
+fraud 
+→
+ label_fraud
+. 
+ - 
+Credit Card Fraud Detection
+: 
+Time 
+→
+ 
+event_time_offset
+, 
+Amount 
+→
+ amount
+, 
+Class 
+→
+ label_fraud
+; most identity fields null. 
+ -
+AML‑Data
+: map transaction sender/receiver (per dataset docs) to parties; laundering tag to 
+label_aml
+. 
+ - 
+AMLSim
+: generator outputs multiple CSVs; use 
+transactions.csv
+ as base fact table; alert
+subgraphs and SAR accounts can become labels and graph edges. 
+ - 
+Elliptic
+: treat each transaction
+node as an event; use paper’s time step notion; use edges as directed flows; labels become 
+label_aml
+/
+label_illicit
+. 
+10
+11
+12
+13
+3
+7
+8
+9
+4
+
+=== PAGE 5 ===
+Architecture: end-to-end workflow, data models, repo layout
+Pipeline architecture diagram
+flowchart LR
+  subgraph Sources
+    A1[IEEE-CIS CSVs] --> I
+    A2[ULB CreditCard CSV] --> I
+    A3[PaySim logs] --> I
+    A4[BankSim CSV] --> I
+    A5[IBM AML-Data CSV] --> I
+    A6[IBM AMLSim outputs] --> I
+    A7[Elliptic node+edge CSVs] --> I
+  end
+  I[Ingestion + Adapters<br/>to canonical transaction_event] --> R[Raw zone<br/
+>parquet]
+  R --> D[dbt staging]
+  D --> M[dbt marts<br/>transaction_mart / entity_mart / alert_mart]
+  M --> F[Point-in-time Feature Builder<br/>SQL as-of or Feast]
+  F --> T[Model training<br/>fraud / AML / ranker]
+  T --> MR[MLflow Tracking + Model Registry]
+  MR --> S1[Batch scoring jobs]
+  MR --> S2[Online scoring API<br/>FastAPI]
+  S1 --> O[Observability + Monitoring<br/>PSI/KS, PR-AUC drift, latency SLOs]
+  S2 --> O
+  O --> C[Analyst Cockpit Dashboard]
+  C --> G[GenAI Analyst Copilot<br/>grounded explanations]
+Key implementation sources for “bank-grade” components: - dbt data tests and the notion of tests returning
+failing records. 
+- MLflow Model Registry: centralized store, versioning, lineage, promotion workflows. 
+- Feast point‑in‑time joins prevent leakage by reproducing feature state at event time; online/offline store
+concepts. 
+- Workflow orchestration: Apache Airflow as “author/schedule/monitor workflows.” 
+Data model diagram (warehouse + graph-ready)
+erDiagram
+  TRANSACTION_EVENT ||--o{ ALERT : "generates"
+  PARTY ||--o{ TRANSACTION_EVENT : "payer"
+  PARTY ||--o{ TRANSACTION_EVENT : "payee"
+  ACCOUNT ||--o{ TRANSACTION_EVENT : "payer_account"
+  ACCOUNT ||--o{ TRANSACTION_EVENT : "payee_account"
+  DEVICE ||--o{ TRANSACTION_EVENT : "device"
+14
+15
+16
+17
+5
+
+=== PAGE 6 ===
+MERCHANT ||--o{ TRANSACTION_EVENT : "merchant"
+  TRANSACTION_EVENT {
+    string event_id PK
+    string dataset_id
+    datetime event_time
+    string channel
+    string txn_type
+    float amount
+    string payer_party_id FK
+    string payee_party_id FK
+    string device_id FK
+    bool label_fraud
+    bool label_aml
+  }
+  ALERT {
+    string alert_id PK
+    string event_id FK
+    float fraud_score
+    float aml_score
+    int priority_rank
+    int investigator_queue_id
+  }
+  PARTY {
+    string party_id PK
+    string party_type
+  }
+  ACCOUNT {
+    string account_id PK
+    string party_id FK
+  }
+  DEVICE {
+    string device_id PK
+  }
+  MERCHANT {
+    string merchant_id PK
+  }
+  GRAPH_EDGE {
+    string src_party_id
+    string dst_party_id
+    datetime edge_time
+    float amount
+6
+
+=== PAGE 7 ===
+string edge_type
+  }
+  PARTY ||--o{ GRAPH_EDGE : "src"
+  PARTY ||--o{ GRAPH_EDGE : "dst"
+dbt layer: staging, marts, and tests
+Your blueprint explicitly calls out warehouse-style modeling and dbt tests (unique, not_null,
+accepted_values, relationships). 
+You will implement: - 
+Staging
+: type casting, timestamp normalization, enum normalization, surrogate keys.
+- 
+Marts
+: - 
+transaction_mart
+: canonical, deduped, enriched transaction facts. - 
+entity_mart
+: parties/
+accounts/devices/merchants (even if synthetic). - 
+alert_mart
+: model scores, alert status, queue
+assignment. - 
+monitoring_mart
+: drift stats (PSI/KS), performance metrics, latency.
+Recommended dbt tests (minimal and powerful): - 
+unique
+ + 
+not_null
+ on 
+event_id
+, 
+event_time
+. 
+- 
+accepted_values
+ on 
+channel
+, 
+txn_type
+ enums. 
+- 
+relationships
+ between 
+transaction_mart.payer_party_id
+ and 
+entity_mart.party_id
+. 
+Repo layout (senior “cues”)
+Path
+What it contains
+Acceptance signal
+adapters/
+Canonical schema adapters per
+dataset
+Same DAG runs on 
+≥
+3 datasets without code
+branching in core pipeline.
+dbt/
+Staging/marts + tests
+dbt build
+ passes locally + in CI.
+features/
+Point-in-time feature builder (SQL
++ optional Feast)
+Feature leakage tests pass; reproducible
+training set.
+models/
+Fraud model, AML graph model,
+ranker
+MLflow logs params/metrics/artifacts per run. 
+serving/
+FastAPI scoring + batch jobs
+Dockerized service; reproducible local demo.
+monitoring/
+Drift/perf/latency monitoring +
+audit logs
+PSI/KS computed; alerts emitted on thresholds.
+dashboards/
+Analyst cockpit mock +
+screenshots
+Clear “investigation queue” + drift heatmap.
+docs/
+ADRs, threat model, model cards,
+datasheets
+Governance artifacts present and referenced in
+README. 
+14
+14
+14
+14
+15
+18
+7
+
+=== PAGE 8 ===
+Modeling: fraud classification, investigation ranking, AML graph
+analytics
+Fraud detection model (classification)
+Core objective: predict whether a 
+transaction_event
+ should be flagged as fraud.
+Model baseline: - Gradient boosting (LightGBM / XGBoost‑style) is a strong baseline for tabular fraud; your
+CV already uses LightGBM in ranking. (CV PDF, p. 2) - For imbalanced fraud, 
+Precision‑Recall metrics
+ are
+central: the PR curve can be more informative than ROC in imbalanced scenarios. 
+- Use 
+Average Precision (AP / PR‑AUC)
+; scikit-learn formally defines AP as a weighted mean of precision
+values across thresholds. 
+Imbalance strategies (implement at least two, compare): - Class weights / cost-sensitive loss (fast baseline). -
+Downsampling negatives for training, but evaluate on untouched distribution. - Thresholding based on a
+cost matrix (below), not on accuracy.
+Calibration: - Implement Platt scaling or isotonic regression (as an optional module), because operational
+risk thresholds care about calibrated probabilities.
+Investigation queue prioritization (Learning‑to‑Rank)
+This is where your portfolio becomes “bank-real”: an operations team does not only need a score; they need
+a 
+queue
+.
+You already have LambdaRank experience (CV PDF, p. 2). Use LightGBM’s ranking objectives: - LightGBM
+supports ranking objectives such as 
+lambdarank
+ and 
+rank_xendcg
+, and documents that
+rank_xendcg
+ is faster with similar performance. 
+- Ranking labels must be integers where higher = more relevant. 
+Design: - Define each 
+queue group
+ as 
+(queue_id = analyst_team_id, day)
+ or 
+(queue_id = 
+region, hour)
+; group size ~100–1000. - Candidate alerts are those above a low fraud-score threshold
+(high recall). - Relevance label example: - 
+3
+: confirmed fraud / laundering - 
+2
+: high-loss fraud or a
+member of known AML ring - 
+1
+: suspicious but unconfirmed - 
+0
+: benign
+Metrics: - 
+NDCG@K
+ and 
+Precision@K
+ to reflect throughput constraints. (CV PDF, p. 2)
+AML graph module (typologies + ring detection)
+Graph input options: - 
+AMLSim
+ explicitly generates synthetic transaction data with known laundering
+patterns, designed to test ML and graph algorithms. 
+- 
+AML‑Data
+ provides transaction records with a laundering tag, fully synthetic. 
+- 
+Elliptic
+ provides a large transaction graph with node features and directed flows, enabling graph models
+for illicit detection. 
+19
+20
+21
+22
+8
+7
+9
+8
+
+=== PAGE 9 ===
+Start with graph features (fast, interpretable): - Node degree, in/out degree, weighted degree by amount -
+PageRank (optional) - Community / clustering coefficient - Ego-network stats: unique counterparties in last
+1h/24h/7d - 
+node2vec
+ embeddings (optional)
+Then add an advanced path (portfolio “extra credit”): - Temporal graph model or GNN for dynamic graphs
+(inspired by the strategy doc’s emphasis on GNN readiness). (FinTech portfolio strategy PDF, p. 2) - For
+Elliptic: treat 
+time_step
+ as temporal dimension and evaluate “train early steps, test later steps.”
+Explainability and audit readiness
+Fraud/AML models are operationally reviewed; you need explanations: - Use SHAP-style explanations for
+tabular baseline; SHAP assigns feature importance values for a prediction. 
+- Log explanations into an immutable audit log (event_id 
+→
+ top drivers), not just show them in notebooks.
+Point-in-time correctness (leakage prevention)
+This is a major real-world standard and an easy place to look “senior.”
+If you use Feast: - Feast performs point‑in‑time correct joins and scans backward from the entity dataframe
+timestamp up to a TTL window. 
+- Feast online store stores only the latest values per entity key (no history). 
+If you implement SQL as-of joins without Feast, keep the pattern explicit:
+-- Example: point-in-time feature for payer_party_id
+-- "txn_count_24h" is computed using only events strictly before the target 
+event_time.
+WITH
+base
+AS
+(
+SELECT
+e
+.
+event_id
+,
+e
+.
+event_time
+,
+e
+.
+payer_party_id
+FROM
+transaction_mart
+e
+),
+hist
+AS
+(
+SELECT
+b
+.
+event_id
+,
+COUNT
+(
+*
+)
+AS
+payer_txn_count_24h
+,
+SUM
+(
+h
+.
+amount
+)
+AS
+payer_amt_sum_24h
+FROM
+base
+b
+JOIN
+transaction_mart
+h
+ON
+h
+.
+payer_party_id
+=
+b
+.
+payer_party_id
+AND
+h
+.
+event_time
+<
+b
+.
+event_time
+AND
+h
+.
+event_time
+>=
+TIMESTAMP_SUB
+(
+b
+.
+event_time
+,
+INTERVAL
+24
+HOUR
+)
+GROUP
+BY
+1
+)
+23
+24
+25
+9
+
+=== PAGE 10 ===
+SELECT
+b
+.
+*
+,
+COALESCE
+(
+h
+.
+payer_txn_count_24h
+,
+0
+)
+AS
+payer_txn_count_24h
+,
+COALESCE
+(
+h
+.
+payer_amt_sum_24h
+,
+0
+.
+0
+)
+AS
+payer_amt_sum_24h
+FROM
+base
+b
+LEFT
+JOIN
+hist
+h
+USING
+(
+event_id
+);
+Cost matrix and thresholding
+Bank-tech decision thresholds are economic decisions, not “0.5 defaults.”
+Define a simple cost matrix: - 
+FN
+ (missed fraud): high cost (loss + reputational + regulatory). - 
+FP
+ (false alert):
+investigation cost + customer friction.
+Optimize threshold under cost: - Choose threshold 
+t
+ minimizing expected cost on a validation set. - For
+ranking, treat the queue as cost-constrained: top-K should capture most FN‑cost reduction.
+Monitoring: performance drift + data drift + SLOs
+Core monitoring objects: - 
+Data drift
+: - PSI (population stability index) is used in credit risk stability testing
+and relates to discrepancy between discrete distributions. 
+- KS test compares distributions of two samples (SciPy 
+ks_2samp
+). 
+ - 
+Performance drift
+: - Rolling
+PR‑AUC/AP, Recall@K, NDCG@K; backtest vs baseline. - 
+Operational SLOs
+ (recommendations; tune later): -
+Online scoring p95 latency target (e.g., <150 ms local; <400 ms cloud). - Batch scoring throughput: X events/
+sec per worker.
+GenAI Analyst Copilot and agent design
+Why a copilot belongs in this project
+You already built “Grounded RAG + Sentinel cockpit” patterns (CV PDF, p. 2). In bank tech, GenAI is only
+credible if it is 
+grounded, access-controlled, and logged
+. This section makes it so.
+RAG conceptual grounding: - RAG combines parametric generation with retrieval of external evidence; the
+canonical RAG paper frames this as combining pre-trained seq2seq with a dense index. 
+Security baseline: - OWASP Top 10 for LLM Applications highlights risks like 
+prompt injection
+ and 
+sensitive
+information disclosure
+. 
+- NIST AI RMF is a widely cited framework for managing AI risks and promoting trustworthy AI. 
+Agent interaction diagram
+sequenceDiagram
+  participant Analyst as Analyst UI (Cockpit)
+  participant API as Sentinel API
+26
+27
+28
+29
+30
+10
+
+=== PAGE 11 ===
+participant RAG as Retrieval Agent
+  participant Eval as Evaluation Agent
+  participant Sec as Security Agent
+  participant LLM as LLM (Chosen Provider)
+  participant VDB as Vector DB (Policies/Playbooks)
+  participant Audit as Audit Log Store
+  Analyst->>API: "Why is alert A123 high risk?"
+  API->>RAG: Build retrieval query (alert context + feature attributions)
+  RAG->>VDB: Retrieve relevant policy/playbook snippets
+  VDB-->>RAG: Top-k grounded passages
+  RAG->>Sec: Redact sensitive fields + enforce access rules
+  Sec-->>RAG: Sanitized context
+  RAG->>LLM: Prompt with retrieved evidence + structured output schema
+  LLM-->>Eval: Draft answer + citations to retrieved passages
+  Eval->>Eval: Check: grounded-only? no policy violations? json schema valid?
+  Eval-->>API: Approved answer (or refusal + safe guidance)
+  API->>Audit: Store question, retrieved docs ids, response, model version
+  API-->>Analyst: Evidence-grounded explanation
+LLM platform choices and where each fits
+You requested explicit platform recommendations. Below is a pragmatic split that also reads well in
+interviews: “expensive reasoning only where needed.”
+Use-case
+Recommended model
+family
+Why
+Analyst explanation
+(short, grounded)
+OpenAI GPT‑5.2
+ or 
+Gemini 2.5 Flash
+GPT‑5.2 supports structured outputs and tool
+use in Responses API; Flash is positioned for
+price-performance and high volume. 
+Deep investigation
+write-ups (slower)
+OpenAI “pro” reasoning
+tier or Gemini 2.5 Pro
+Higher reasoning capability for longer narrative
+summaries; Gemini Pro is positioned as state-of-
+the-art “thinking.” 
+Local / on-prem demo
+(data sovereignty
+story)
+OpenAI 
+gpt‑oss‑20b
+ / 
+gpt‑oss‑120b
+ (open-
+weight)
+OpenAI documents Apache‑2.0 licensing and
+“local or specialized use cases”; good for
+privacy-forward narrative. 
+Important OpenAI platform note: - OpenAI docs state the 
+Assistants API is deprecated
+ and will shut down
+Aug 26, 2026
+, recommending migration to the Responses API. 
+Gemini integration note: - Gemini model docs list explicit capabilities such as function calling and structured
+outputs for Gemini 2.5 models. 
+- Vertex AI grounding with Vertex AI Search supports using proprietary data sources for RAG. 
+31
+32
+33
+34
+35
+36
+11
+
+=== PAGE 12 ===
+Copilot safeguards (OWASP-aligned)
+Implement concrete mitigations mapped to OWASP LLM risks: - 
+Prompt injection
+: never execute user-
+supplied instructions as tools; isolate tool schemas; allowlist tool calls. 
+- 
+Sensitive information disclosure
+: redact PII fields before retrieval/LLM; enforce role-based access at
+retrieval time. 
+- 
+Overreliance
+: UI labels “assistant suggestion,” show evidence snippets + confidence. 
+- 
+Excessive agency
+: copilot cannot take irreversible actions; only drafts case notes; human approval
+required. 
+Delivery plan, governance, and risk management
+Implementation plan with milestones and estimates
+Milestone
+Deliverables
+ETA
+(typical)
+Foundation
+Repo skeleton, devcontainer, adapters for 2 datasets, canonical
+schema
+3–5 days
+dbt layer
+staging + marts + tests + CI 
+dbt build
+5–8 days
+Feature layer
+point-in-time builder (SQL and/or Feast), leakage tests
+5–8 days
+Modeling v1
+fraud classifier + MLflow tracking + baseline report
+4–7 days
+Ranking
+alert generator + LambdaRank + NDCG@K evaluation
+4–7 days
+Graph AML
+AML‑Data baseline + AMLSim graph patterns + graph features
+6–10 days
+Serving +
+monitoring
+FastAPI scoring + batch scoring + PSI/KS + dashboards
+6–10 days
+Copilot
+grounded explanations + security agent + audit logs
+6–10 days
+Orchestration options: - Airflow is explicitly positioned as a platform to author/schedule/monitor workflows.
+- Prefect emphasizes that code/data stay in your infrastructure and adds orchestration via decorators. 
+CI tests and acceptance criteria
+Area
+Acceptance test
+Passing signal
+Data quality
+dbt test
+ on staging/marts
+0 failing rows for key tests. 
+Leakage
+Feature build uses 
+event_time
+cutoffs only
+Unit test: no future timestamps in training
+rows.
+Model
+registry
+Train 
+→
+ register 
+→
+ load “champion”
+MLflow run artifacts + model version visible. 
+29
+29
+29
+29
+17
+37
+14
+15
+12
+
+=== PAGE 13 ===
+Area
+Acceptance test
+Passing signal
+Ranking
+Grouped ranking train/eval
+NDCG@K improves vs heuristic baseline. 
+Drift
+PSI/KS computed per feature group
+Drift report generated; alerts on thresholds. 
+Copilot
+safety
+Redaction + grounded-only answers
+Evaluation agent blocks ungrounded / unsafe
+outputs. 
+Reproducibility and GitHub presentation rules
+Non-negotiables (these are portfolio “trust signals”): - 
+No raw datasets committed
+; use download scripts +
+checksums + 
+.gitignore
+. - Provide “demo mode” with a tiny synthetic seed dataset that mimics schema.
+- Every experiment run should be reproducible via 
+make setup
+, 
+make train
+, 
+make score
+, 
+make 
+dashboard
+. - Provide screenshots of cockpit dashboards + a 3–5 minute recorded demo walkthrough.
+Containerization story: - Docker defines containers as isolated processes that package dependencies and
+are portable across environments. 
+Kubernetes story (optional): - Pods are the smallest deployable units in Kubernetes; Deployments manage
+Pods for an application workload. 
+CI/CD story: - GitHub Actions automates workflows including CI/CD. 
+Governance artifacts: model cards + datasheets + NIST AI RMF alignment
+Model transparency: - “Model Cards for Model Reporting” proposes model cards to document intended use,
+evaluation, and relevant factors. 
+Dataset transparency: - “Datasheets for Datasets” argues datasets should be documented with motivation,
+composition, collection process, uses, and maintenance. 
+NIST AI RMF mapping (practical interpretation): - Map “Govern” to ownership, policies, and audit logs. - Map
+“Measure” to monitoring metrics (PR‑AUC, PSI/KS, SLOs). - Map “Manage” to incident processes (rollback
+model, freeze scoring, increase thresholds). (Framework overview and intent from NIST). 
+Risk matrix (data, model, security, regulatory, operational)
+Risk
+Level
+Mitigation and monitoring
+Dataset license misuse
+High
+Record license per dataset; enforce “no data committed”;
+include datasheets. IBM AML‑Data explicitly distinguishes repo
+license vs data license. 
+Leakage via time
+features
+High
+Point‑in‑time joins (Feast or strict SQL rules). 
+Class imbalance causes
+false confidence
+High
+PR‑AUC/AP reporting; cost-based thresholding; compare to
+ROC cautiously. 
+22
+38
+29
+39
+40
+41
+42
+43
+30
+44
+24
+45
+13
+
+=== PAGE 14 ===
+Risk
+Level
+Mitigation and monitoring
+Investigator overload
+(too many false
+positives)
+High
+Add ranker (LambdaRank) to optimize top‑K throughput;
+monitor alert volume. 
+Model/data drift in
+production
+High
+PSI + KS plus performance drift; PSI has formal motivation in
+credit risk stability work. 
+LLM prompt injection /
+disclosure
+High
+OWASP Top10 mitigations; security agent redaction; grounded-
+only answers. 
+Over-automation
+(excessive agency)
+Medium
+Human-in-the-loop gates; copilot suggests, never executes. 
+Audit inability
+Medium
+Immutable audit logs for scores, explanations, model versions
+(MLflow lineage). 
+Appendix: project naming, README snippet, and “what to ship”
+Suggested original project name
+A name that is memorable and interview-friendly while staying professional: - 
+LedgerSentinel
+(recommended): “ledger” signals transaction history; “sentinel” signals monitoring + response. -
+Alternatives: 
+GraphSentinel AML
+, 
+RiskSignal Ops
+, 
+QueueRank AML
+.
+Commit-ready README opening snippet
+# LedgerSentinel — Fraud & AML Graph Intelligence Platform
+LedgerSentinel is a production-style, portfolio-safe platform for:
+1) Fraud detection (imbalanced classification),
+2) AML typology + ring detection (graph analytics),
+3) Investigation queue prioritization (Learning-to-Rank),
+4) Monitoring + audit-ready explanations (drift + model cards),
+5) A grounded Analyst Copilot (RAG with strict security controls).
+> 
+No real bank data is used. This repo ships only code + schemas + small 
+synthetic demo data.
+> 
+Public/synthetic datasets are downloaded at runtime and mapped into a 
+canonical `transaction_event` schema.
+## Demo in 5 minutes
+-
+`make setup`
+-
+`make ingest DATASET=paysim`
+-
+`make dbt_build`
+-
+`make train_fraud`
+-
+`make make_alerts && make rank_queue`
+22
+38
+29
+29
+46
+14
+
+=== PAGE 15 ===
+-
+`make serve`
+  # FastAPI
+-
+`make dashboard`
+Dashboard/graph visualization inspiration
+https://www.researchgate.net/publication/
+313138956_PAYSIM_A_FINANCIAL_MOBILE_MONEY_SIMULATOR_FOR_FRAUD_DETECTION
+https://www.researchgate.net/publication/
+313138956_PAYSIM_A_FINANCIAL_MOBILE_MONEY_SIMULATOR_FOR_FRAUD_DETECTION
+https://github.com/amazon-science/fraud-dataset-benchmark
+https://github.com/amazon-science/fraud-dataset-benchmark
+https://berd-platform.de/records/qcqqe-g6q16
+https://berd-platform.de/records/qcqqe-g6q16
+https://github.com/EdgarLopezPhD/PaySim
+https://github.com/EdgarLopezPhD/PaySim
+https://baselight.app/u/kaggle/dataset/ealaxi_paysim1
+https://baselight.app/u/kaggle/dataset/ealaxi_paysim1
+https://www.researchgate.net/publication/
+265736405_BankSim_A_Bank_Payment_Simulation_for_Fraud_Detection_Research
+https://www.researchgate.net/publication/265736405_BankSim_A_Bank_Payment_Simulation_for_Fraud_Detection_Research
+https://github.com/IBM/AML-Data
+https://github.com/IBM/AML-Data
+https://github.com/IBM/AMLSim
+https://github.com/IBM/AMLSim
+https://arxiv.org/abs/1908.02591
+https://arxiv.org/abs/1908.02591
+https://gitmemories.com/amazon-science/fraud-dataset-benchmark
+https://gitmemories.com/amazon-science/fraud-dataset-benchmark
+https://docs.getdbt.com/docs/build/data-tests
+https://docs.getdbt.com/docs/build/data-tests
+https://www.mlflow.org/docs/3.0.1/model-registry
+https://www.mlflow.org/docs/3.0.1/model-registry
+https://docs.feast.dev/master/getting-started/concepts/point-in-time-joins
+https://docs.feast.dev/master/getting-started/concepts/point-in-time-joins
+https://airflow.apache.org/index.html
+https://airflow.apache.org/index.html
+https://arxiv.org/pdf/1810.03993.pdf
+https://arxiv.org/pdf/1810.03993.pdf
+1
+2
+3
+4
+5
+12
+6
+13
+7
+11
+44
+8
+9
+10
+14
+15
+46
+16
+24
+17
+18
+42
+15
+
+=== PAGE 16 ===
+https://pubmed.ncbi.nlm.nih.gov/25738806/
+https://pubmed.ncbi.nlm.nih.gov/25738806/
+https://scikit-learn.org/1.3/modules/generated/sklearn.metrics.average_precision_score.html
+https://scikit-learn.org/1.3/modules/generated/sklearn.metrics.average_precision_score.html
+https://lightgbm.readthedocs.io/en/v4.5.0/Parameters.html
+https://lightgbm.readthedocs.io/en/v4.5.0/Parameters.html
+https://papers.nips.cc/paper/7062-a
+https://papers.nips.cc/paper/7062-a
+https://docs.feast.dev/getting-started/components/online-store
+https://docs.feast.dev/getting-started/components/online-store
+https://orion.journals.ac.za/pub/article/view/678
+https://orion.journals.ac.za/pub/article/view/678
+https://docs.scipy.org/doc/scipy-1.12.0/reference/generated/scipy.stats.ks_2samp.html
+https://docs.scipy.org/doc/scipy-1.12.0/reference/generated/scipy.stats.ks_2samp.html
+https://arxiv.org/abs/2005.11401
+https://arxiv.org/abs/2005.11401
+https://owasp.org/www-project-top-10-for-large-language-model-applications/
+https://owasp.org/www-project-top-10-for-large-language-model-applications/
+https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-ai-rmf-10
+https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-ai-rmf-10
+https://platform.openai.com/docs/models/gpt-5.2/
+https://platform.openai.com/docs/models/gpt-5.2/
+https://platform.openai.com/docs/models/gpt-5.2-pro
+https://platform.openai.com/docs/models/gpt-5.2-pro
+https://platform.openai.com/docs/models/gpt-oss-20b
+https://platform.openai.com/docs/models/gpt-oss-20b
+https://platform.openai.com/docs/assistants/tools
+https://platform.openai.com/docs/assistants/tools
+https://ai.google.dev/models/gemini
+https://ai.google.dev/models/gemini
+https://cloud.google.com/vertex-ai/generative-ai/docs/grounding/grounding-with-your-data
+https://cloud.google.com/vertex-ai/generative-ai/docs/grounding/grounding-with-your-data
+https://www.prefect.io/how-it-works
+https://www.prefect.io/how-it-works
+https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/
+https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/
+https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/
+https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/
+19
+45
+20
+21
+22
+23
+25
+26
+38
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+39
+40
+16
+
+=== PAGE 17 ===
+https://docs.github.com/en/actions
+https://docs.github.com/en/actions
+https://arxiv.org/abs/1803.09010
+https://arxiv.org/abs/1803.09010
+41
+43
+17

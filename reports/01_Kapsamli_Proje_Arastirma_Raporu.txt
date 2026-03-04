@@ -1,0 +1,277 @@
+FRAUD - AML GRAPH PROJESI
+KAPSAMLI TEKNIK ARASTIRMA VE DURUM ANALIZ RAPORU
+Tarih: 26 Subat 2026
+
+====================================================================
+1) RAPOR KAPSAMI VE YONTEM
+====================================================================
+Bu rapor, calisma klasorundeki tum proje artefaktlarini teknik due diligence
+bakis acisiyla inceleyerek hazirlanmistir.
+
+Inceleme metodu:
+- Mevcut PDF dokumanlarinin metin katmaninin teknik olarak cikarilmasi
+- Mimari, veri, model, MLOps, guvenlik ve operasyon boyutlarinda analiz
+- Uygulanabilirlik ve uretim olgunlugu acisindan bosluk analizi
+- Yeniden yapilabilirlik icin gerekli teknik kosullarin cikarimi
+
+Onemli gozlem:
+- Depoda uygulama kodu, altyapi kodu, test, pipeline dosyalari veya CI konfigu
+  yoktur.
+- Depoda yalnizca dokuman niteliginde PDF dosyalari vardir.
+- Bu nedenle bu rapor, "tasarim niyeti ve hedef mimari" ile
+  "fiili implementasyon olgunlugu" arasindaki farki merkeze alir.
+
+====================================================================
+2) INCELENEN KAYNAKLAR
+====================================================================
+1. Fraud & AML Graph Sentinel - Senior-Level Bank-Tech Portfolio Project (17 sayfa)
+2. Fraud_AML_Graph_Sentinel_Raporu (3 sayfa)
+
+Bu iki dokuman birlestirilerek proje kapsaminda su alanlar degerlendirilmistir:
+- Veri kaynaklari ve lisanslama
+- Kanonik sema (transaction_event)
+- dbt ve veri ambari katmani
+- Point-in-time feature engineering ve leakage onleme
+- Fraud siniflandirma ve ranker katmani
+- AML graph analitigi
+- GenAI copilot + guvenlik kontrolleri
+- Monitoring, drift, audit ve yonetisim artefaktlari
+
+====================================================================
+3) YONETICI OZETI
+====================================================================
+Bu proje fikri, bankacilikta gercekten deger uretecek bir "uctan uca fraud + AML
+analitik platformu" tasarimi sunmaktadir. Dokuman kalitesi yuksektir ve bank-tech
+mulakatlarinda guclu sinyal verecek dogru kavramlari icermektedir.
+
+Ancak fiili kod tabani bulunmadigi icin proje su anda fikir ve tasarim asamasindadir.
+
+Guclu taraflar:
+- Banka-gercekligi yuksek mimari catisi
+- Point-in-time correctness ve leakage farkindaligi
+- Imbalanced fraud icin dogru metrik secimi (PR-AUC/AP)
+- Alarm kuyrugu optimizasyonu icin Learning-to-Rank (LambdaRank)
+- AML graph dusuncesi (AMLSim, AML-Data, Elliptic)
+- GenAI copilot icin grounded + redaction + audit yaklasimi
+- Drift icin PSI + KS ve operasyonel SLO perspektifi
+
+Kritik eksikler:
+- Kod yok
+- CI/CD yok
+- Calisabilir veri pipeline yok
+- Ortam kurulum tarifi (devcontainer, lockfile, makefile) yok
+- dbt proje dosyalari yok
+- Model egitim/servis kodu yok
+- Monitoring ve audit altyapisi yok
+
+Net sonuc:
+- Tasarim seviyesi: Yuksek
+- Uygulama seviyesi: Baslangic (neredeyse sifir)
+- Uretime yakinlik: Dusuk
+- Dogru plan ile yeniden yapilabilirlik: Yuksek (cunku kapsam net)
+
+====================================================================
+4) PROJENIN HEDEF COZDUGU IS PROBLEMI
+====================================================================
+Proje, sadece fraud skoru ureten bir model degil, su operasyonel problemi cozmeyi
+hedefliyor:
+- Islem bazli fraud/AML risk tespiti
+- Soruşturma ekiplerinin kapasitesine uygun alarm onceliklendirmesi
+- Alert aciklamalarinin denetlenebilir ve delil tabanli sunulmasi
+- Uretimde model/veri sapmalarinin yakalanmasi
+
+Bu, bankacilikta tipik "model yaptim" degil, "operasyonel karar sistemi kurdum"
+seviyesinde bir hedef tanimidir.
+
+====================================================================
+5) MIMARI INCELEME (HEDEF TASARIM)
+====================================================================
+5.1 Veri Katmani
+- Coklu datasetten kanonik transaction_event semasina adapter yaklasimi
+- dbt staging + marts katmani
+- transaction_mart, entity_mart, alert_mart, monitoring_mart ayrimi
+
+5.2 Feature Katmani
+- Point-in-time join prensibi
+- SQL as-of join ornekleri net verilmis
+- Leakage riskini dogrudan ele alan kural seti var
+
+5.3 Modelleme Katmani
+- Fraud: tabular gradient boosting baseline
+- Ranking: LambdaRank / NDCG@K ile investigator queue optimizasyonu
+- AML: graph feature + opsiyonel GNN yolu
+
+5.4 Serving ve Operasyon
+- Batch scoring + online scoring (FastAPI)
+- Registry ve lineage (MLflow hedefi)
+- Monitoring: PSI/KS + performans drift
+
+5.5 GenAI Copilot
+- RAG ile policy/playbook retrieval
+- Security redaction agent
+- Grounded-only cevap
+- Human-in-the-loop
+- Audit log
+
+Degerlendirme:
+- Mimari katmanlar dogru sirada ve gercek bankacilik problemini yansitacak sekilde
+  tanimlanmis.
+- Tasarimda "governance by design" ilkesi bulunuyor.
+
+====================================================================
+6) VERI KAYNAKLARI VE LISANS DURUMU
+====================================================================
+Dokumanlarda onerilen kaynaklarin kapsami guclu. Fraud + AML + graph boyutlari
+birbirini tamamliyor.
+
+Kritik lisans notlari:
+- IEEE-CIS ve Kaggle kaynaklari: kullanim sartlari dikkatle okunmali
+- PaySim: GPL-3.0 kaynak kod lisansi etkisi var
+- IBM AML-Data: repo lisansi ile veri lisansi ayri ele alinmali
+- Veri commit etmeme kurali: mutlak zorunluluk
+
+Bu kisim, yeniden yapilabilirlikte en kritik hukuki/risk boyutudur.
+
+====================================================================
+7) LEAKAGE ONLEME MIMARISI DEGERLENDIRMESI
+====================================================================
+Turkce raporun en guclu kismi, leakage konusunun dogrudan dbt/SQL seviyesinde
+kurgulanmasi.
+
+Dogru ilkeler:
+- event_time tabanli katı oncelik kuralı
+- h.event_time < b.event_time sartinin zorunlu tutulmasi
+- Zaman pencerelerinin net tanimi (24h vb.)
+- CI icinde leakage testlerinin calistirilmasi
+- Kritik testlerde 0 failing rows kabul kriteri
+
+Bu yaklasim gercek hayatta modelin "labde iyi, uretimde kotu" olmasini onleyen en
+onemli kontrol katmanidir.
+
+====================================================================
+8) MODELLEME VE ANALITIK DEGERLENDIRME
+====================================================================
+8.1 Fraud Siniflandirma
+Dogru kararlar:
+- ROC yerine PR-AUC/AP odaklanmasi
+- Cost-sensitive threshold secimi
+- Imbalanced veri icin klasik yaklasimlarin birlikte denenmesi
+
+8.2 Ranking Katmani
+Bankalarda asıl deger, analist kuyruğunu optimize etmektir. Dokuman bu gercegi
+dogru yakaliyor.
+
+Beklenen KPIlar:
+- NDCG@K
+- Precision@K
+- Recall@K
+- Alert basina analist sure maliyeti
+
+8.3 AML Graph
+- AMLSIM / AML-Data / Elliptic kombinasyonu dogru
+- Ilk fazda aciklanabilir graph feature
+- Ikinci fazda temporal graph veya GNN
+
+====================================================================
+9) GENAI COPILOT VE GUVENLIK DEGERLENDIRMESI
+====================================================================
+Dokuman, "LLM kullanalim" seviyesinde kalmiyor; su kontrolleri zorunlu tutuyor:
+- Prompt injection onlemleri
+- PII redaction
+- Tool allowlist
+- Grounded-only cevap
+- Structured output validation
+- Audit trail kaydi
+
+Bu guclu bir yaklasimdir. Ancak fiili uygulamada su artefaktlar olmadan guvenlik
+iddiasi dogrulanamaz:
+- Threat model dosyasi
+- Prompt firewall testleri
+- Redaction unit/integration testleri
+- Role based access kontrol testleri
+
+====================================================================
+10) MLOPS VE OPERASYON OLUNLUK DEGERLENDIRMESI
+====================================================================
+Hedeflenen ama eksik olan alanlar:
+- MLflow tracking/registry implementasyonu
+- CI pipeline icinde dbt + model + guvenlik testleri
+- Orchestration DAG'lari
+- Monitoring joblari
+- SLO/SLA dashboardlari
+
+Bunlar olmadan proje "production-style" olarak etiketlenemez.
+
+====================================================================
+11) FIILI DEPO DURUMU VE BOSLUK ANALIZI
+====================================================================
+Durum:
+- Mevcut: Dokuman
+- Eksik: Kod + test + altyapi + otomasyon
+
+Bosluklar:
+1. Data ingestion katmani yok
+2. Kanonik schema kodu yok
+3. dbt project yapisi yok
+4. Feature builder yok
+5. Model train/eval pipeline yok
+6. Ranker pipeline yok
+7. Graph pipeline yok
+8. API serving yok
+9. Monitoring mekanizmasi yok
+10. Copilot pipeline yok
+11. CI/CD yok
+12. Governance artefaktlari dosya bazinda eksik
+
+====================================================================
+12) 90 GUNLUK ONCELIKLI UYGULAMA PLANI
+====================================================================
+Gun 0-30:
+- Repo iskeleti + makefile + environment lock
+- 2 dataset adapter + canonical transaction_event
+- dbt staging/marts + temel testler
+- Leakage testinin ilk versiyonu
+
+Gun 31-60:
+- Fraud baseline model + MLflow
+- Alert ureteci + ranker (LambdaRank)
+- Baslangic monitoring (PSI/KS + PR-AUC trend)
+- FastAPI scoring endpoint
+
+Gun 61-90:
+- AML graph feature pipeline
+- Copilot v1 (grounded + redaction + audit)
+- Dashboard + incident runbook
+- CI/CD quality gates + governance dokumanlari
+
+====================================================================
+13) KABUL KRITERLERI (ACCEPTANCE)
+====================================================================
+Bu proje "yeniden yapildi" demek icin asgari sinirlar:
+- Tek komutla ortam kurulumu
+- En az 2 datasette ayni DAG'in calismasi
+- dbt testlerinin temiz gecmesi
+- Leakage testlerinde sifir ihlal
+- Fraud modelinde PR-AUC raporu
+- Rankerde NDCG@K iyilesmesi
+- Monitoring ciktilarinin dosya/tabloda kayitlanmasi
+- Audit logda model surumu + aciklama izlenebilirligi
+
+====================================================================
+14) SONUC
+====================================================================
+Bu proje, fikir ve tasarim kalitesi acisindan guclu bir "senior-level bank-tech"
+portfoy adayi. Kritik fark su:
+
+- Dokuman seviyesi: Cok iyi
+- Implementasyon seviyesi: Baslangic
+
+Dogru teknik yonetimle 8-12 haftada etkileyici bir PoC ve 12-16 haftada
+muhendislik kalitesi yuksek bir "production-like" demonstrator olusturulabilir.
+
+Bu raporun ana karari:
+- Proje mutlaka yeniden yapilabilir.
+- Yeniden yapilabilirlik seviyesi, teknik kapsam netligi nedeniyle yuksek potansiyele
+  sahip.
+- Basariyi belirleyecek unsur, dokumandaki mimari kararlarin kod, test ve CI ile
+  disiplinli sekilde hayata gecirilmesidir.

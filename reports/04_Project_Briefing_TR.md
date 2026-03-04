@@ -1,0 +1,254 @@
+# Fraud - AML Graph Sentinel | Ara Briefing Raporu
+
+Uretim tarihi (UTC): 2026-03-04T20:58:22Z
+
+## 1. Proje Kimligi
+- Proje adi: Fraud - AML Graph Sentinel
+- Konu: Fraud detection + AML monitoring + graph intelligence + investigation queue + BigQuery analytics
+- Kapsam: Senior-level bank-tech portfolio project; canonical ingestion, local warehouse, baseline model, queueing, graph layer, BigQuery sync, reporting and dashboard.
+- Amac: Birden fazla sentetik/benchmark fraud ve AML veri kaynagini ortak bir finansal risk izleme yuzeyinde birlestirmek; siralanmis inceleme kuyrugu ve graph watchlist ile investigasyon verimliligini artirmak.
+
+## 2. Amaclar ve Hedefler
+- Heterojen veri kaynaklarini ortak veri sozlesmesinde toplamak
+- Deterministik ve yeniden uretilebilir local pipeline kurmak
+- Fraud scoring ve investigation ranking saglamak
+- Graph tabanli entity ve cluster risk sinyali uretmek
+- BigQuery uzerinden analytics ve validator katmani kurmak
+- Yonetici sunumuna uygun rapor ve dashboard katmani hazirlamak
+
+## 3. Yanitlanan Is Sorulari
+- Hangi transactions ve hangi queue gunleri investigasyon onceligine alinmali?
+- Hangi dataset veya davranis siniflari model tarafinda daha riskli gozukuyor?
+- Fraud sinyali ile AML sinyalini ayni risk yuzeyinde nasil birlikte izleriz?
+- Hangi party/account yapilari graph seviyesinde supheli cluster olusturuyor?
+- Local pipeline ile BigQuery analytical layer arasinda veri kaybi veya contract drift var mi?
+- Quality gate'ler sifir defect seviyesinde mi?
+
+## 4. Aktif Datasetler ve Hazir Alanlar
+- ieee_cis -> kart/online transaction fraud benchmark
+- creditcard_fraud -> labelled card fraud benchmark
+- paysim -> payment simulator fraud benchmark
+- ibm_aml_data -> synthetic AML transactions with laundering labels
+- banksim / ibm_amlsim / elliptic -> klasor yapisi hazir, mevcut asamada bos ve opsiyonel ikinci faz
+
+## 5. Metodoloji
+- Canonical schema normalization
+- SQLite-based reproducible warehouse
+- Point-in-time feature engineering
+- Numpy/Pandas baseline linear fraud model
+- Daily investigation queue ranking with P@K and NDCG@K evaluation
+- Graph node/edge aggregation and connected-cluster summarization
+- Artifact-first validation and evidence-driven reporting
+- BigQuery mirror plus SQL analytics/validation layer
+
+## 6. Toolchain ve Paketler
+### Genel Paketler
+- argparse
+- ast
+- base64
+- csv
+- dataclasses
+- datetime
+- google
+- json
+- matplotlib
+- numpy
+- os
+- pandas
+- pathlib
+- re
+- shutil
+- sqlite3
+- textwrap
+- time
+- typing
+- zlib
+
+### Script Bazli Import Haritasi
+- bigquery_test_connection.py: google, os, pathlib
+- build_analyst_casebook.py: argparse, datetime, json, pathlib, sqlite3, typing
+- build_analyst_prompt_pack.py: argparse, datetime, json, pathlib, typing
+- build_dashboard_bundle.py: datetime, json, pathlib, sqlite3, typing
+- build_graph_layer.py: argparse, datetime, json, pathlib, sqlite3, typing
+- build_investigation_queue.py: argparse, datetime, json, numpy, pandas, pathlib, sqlite3, typing
+- build_sqlite_warehouse.py: argparse, datetime, json, pandas, pathlib, sqlite3, typing
+- cleanup_incomplete_runs.py: argparse, dataclasses, json, pathlib, shutil, typing
+- extract_pdf_text.py: argparse, base64, dataclasses, pathlib, re, typing, zlib
+- generate_checkpoint_reports.py: datetime, json, matplotlib, os, pathlib, textwrap, typing
+- generate_master_final_report.py: ast, csv, datetime, json, matplotlib, os, pathlib, textwrap, typing
+- generate_master_final_report_en.py: datetime, json, matplotlib, os, pathlib, textwrap, typing
+- generate_project_briefing_report.py: ast, datetime, json, matplotlib, os, pathlib, textwrap, typing
+- ingest_canonical.py: argparse, dataclasses, datetime, json, numpy, pandas, pathlib, re, typing
+- run_bigquery_sql_bundle.py: argparse, csv, datetime, google, json, os, pathlib, typing
+- run_vertex_analyst_copilot.py: argparse, datetime, google, json, os, pathlib, time, typing
+- score_fraud_baseline_numpy.py: argparse, datetime, json, numpy, pandas, pathlib, sqlite3, typing
+- sqlite_to_bigquery.py: argparse, datetime, google, json, numpy, os, pandas, pathlib, sqlite3, typing
+- train_fraud_baseline_numpy.py: argparse, csv, dataclasses, datetime, json, numpy, pandas, pathlib, shutil, sqlite3, typing
+- validate_analyst_casebook.py: argparse, json, pathlib, typing
+- validate_analyst_prompt_pack.py: argparse, json, pathlib, typing
+- validate_analyst_sql_bundle.py: datetime, json, pathlib, re, typing
+- validate_bigquery_state.py: argparse, datetime, google, json, os, pathlib, typing
+- validate_dashboard_bundle.py: datetime, json, pathlib, re, typing
+- validate_executive_sql_bundle.py: datetime, json, pathlib, re, typing
+- validate_graph_state.py: argparse, json, pathlib, sqlite3, typing
+- validate_pipeline_state.py: argparse, json, pathlib, sqlite3, typing
+- validate_vertex_analyst_outputs.py: argparse, json, pathlib, typing
+- vertex_outputs_to_bigquery.py: argparse, datetime, google, json, os, pathlib, typing
+
+## 7. Uctan Uca Workflow / Pipeline
+### Mermaid Diyagrami
+```mermaid
+flowchart TD
+    A[Manual datasets in data/raw] --> B[ingest_canonical.py]
+    B --> C[transaction_event_raw]
+    C --> D[build_sqlite_warehouse.py]
+    D --> E[stg_transaction_event]
+    E --> F[transaction_mart]
+    F --> G[feature_payer_24h]
+    F --> H[monitoring_mart]
+    F --> I[train_fraud_baseline_numpy.py]
+    I --> J[fraud baseline model]
+    J --> K[score_fraud_baseline_numpy.py]
+    K --> L[fraud_scores]
+    L --> M[build_investigation_queue.py]
+    M --> N[alert_queue]
+    F --> O[build_graph_layer.py]
+    L --> O
+    N --> O
+    O --> P[graph nodes and edges]
+    F --> Q[sqlite_to_bigquery.py]
+    G --> Q
+    H --> Q
+    L --> Q
+    N --> Q
+    P --> Q
+    Q --> R[BigQuery dev tables]
+    R --> S[Analytics SQL bundles]
+    R --> T[Validation SQL bundles]
+    F --> U[generate_checkpoint_reports.py]
+    R --> U
+    U --> V[checkpoint pdf/txt/json]
+    U --> W[build_dashboard_bundle.py]
+    W --> X[static dashboard bundle]
+```
+
+### ASCII Akis
+- data/raw/* datasets
+-   -> ingest_canonical.py
+-   -> data/curated/transaction_event
+-   -> build_sqlite_warehouse.py
+-   -> transaction_event_raw / stg_transaction_event / transaction_mart
+-   -> feature_payer_24h + monitoring_mart
+-   -> train_fraud_baseline_numpy.py
+-   -> fraud baseline model
+-   -> score_fraud_baseline_numpy.py
+-   -> fraud_scores
+-   -> build_investigation_queue.py
+-   -> alert_queue
+-   -> build_graph_layer.py
+-   -> graph_* tables
+-   -> sqlite_to_bigquery.py
+-   -> BigQuery dev_* tables
+-   -> run_bigquery_sql_bundle.py (analytics + validation)
+-   -> validate_bigquery_state.py
+-   -> generate_checkpoint_reports.py
+-   -> build_dashboard_bundle.py
+-   -> reports + dashboard
+
+## 8. Bu Asamaya Kadar Yapilanlar
+- Dataset layout and manual download verification
+- Canonical ingestion pipeline for four active datasets
+- Warehouse build with transaction mart, feature mart and monitoring mart
+- Fraud baseline training, scoring and ranking pipeline
+- Graph node/edge and cluster layer
+- BigQuery connection, full sync, analytics SQL and validation SQL
+- Vertex AI groundwork: region, service account, bucket
+- TR/EN operational checkpoint reports
+- Static executive dashboard bundle seeded from validated artifacts
+- Dashboard QA validator and evidence metadata layer
+- Vertex AI + Gemini live smoke path validated and latest analyst output surfaced into the dashboard
+
+## 9. Guncel Dogrulanmis Durum
+- transaction_mart: 1,184,807
+- feature_payer_24h: 150,000
+- monitoring_mart: 90
+- fraud_scores: 884,807
+- alert_queue distinct queue: 88
+- mean_precision_at_k: 7.45%
+- mean_ndcg_at_k: 7.11%
+- graph_party_node: 582,652
+- graph_party_edge: 462,948
+- graph_party_cluster_summary: 134,702
+- BigQuery ok: True
+- Dashboard completion MVP/vision: %88 / %70
+- Vertex analyst smoke ok: True
+- Vertex analyst model: gemini-2.5-flash
+- Vertex analyst response_count: 3
+
+## 10. Yeniden Kosulan Audit ve Testler
+- python3 -m compileall -q scripts -> PASS
+- make check-datasets -> PASS
+- python3 scripts/cleanup_incomplete_runs.py -> candidate_count=0
+- make validate-state -> PASS
+- make graph-validate -> PASS
+- PRAGMA integrity_check -> ok
+- PRAGMA quick_check -> ok
+- python3 scripts/build_dashboard_bundle.py -> PASS
+- python3 scripts/validate_dashboard_bundle.py -> PASS
+- make agent-vertex-validate -> PASS
+- Local sandbox icinde yeniden validate denemesi cevap donmedi; bu nedenle remote durum icin 2026-02-27T14:24:44Z tarihli son PASS artifact baz alindi.
+
+## 11. Kapatilan / Revize Edilen Kritik Noktalar
+- source_event_id type drift kapatildi ve STRING/TEXT standardize edildi
+- label_aml mixed-type problemi kapatildi ve nullable INT sozlesmesine cekildi
+- party_id / account_id namespace collision giderildi
+- Graph validators ile namespace clash fail condition haline getirildi
+- Warehouse scoring path icin kritik indexler eklendi
+- Yarim kalan IBM run artiklari temizlendi; mevcut candidate_count=0
+- Dashboard tarafinda no-score lens (IBM) icin sahte overview fallback kaldirildi
+- Dashboard tarafinda amount alanlari icin gereksiz USD iddiasi kaldirildi; sayisal magnitude sunumu kullanildi
+- Dashboard icin publish-breaking drift, missing artifact ve DOM binding validator eklendi
+- Vertex analyst runtime icin cloud-platform scope eklendi; invalid_scope hatasi kapatildi
+- Vertex structured output icin JSON schema, retry ve quota-light smoke politikasi eklendi
+
+## 12. Kritik Riskler, Puf Noktalari ve Dikkat Edilecek Asamalar
+- Ayni sayfada fraud ve AML sinyalini gostermek kolayca semantik karisiklik yaratir; label source alanlari net ayrilmali
+- Amount alanlari kaynak para birimi bazli olabilir; normalized currency iddiasi ancak fx donusumu ile acikca yapilmali
+- IBM AML veri hacmi buyuk; uncapped ingest disk ve zaman maliyeti yaratir
+- Dashboard tarafinda no-score datasetler icin sahte fallback gosterimi karar yanlisi uretir
+- BigQuery tarafinda remote revalidation sansli ortam gerektirir; artifact timestamp'i izlenmeli
+- Namespace ayrimi bozulursa graph node ve edge anlamini kaybeder; validatorlar bypass edilmemeli
+- Feature engineering pencereleri point-in-time kurallarina bagli; leakage riski kritik
+- Queue metrics yuksek gorunse bile class imbalance nedeniyle threshold ve business cost birlikte okunmali
+- Vertex free-trial veya dusuk quota ortaminda ard arda multi-prompt smoke 429 uretebilir; smoke testi bilincli olarak kucuk tutulmali
+
+## 13. En Kritik Parcalar
+- transaction_mart veri sozlesmesi projenin en kritik omurgasi; upstream/downstream her sey buraya bagli
+- validate_pipeline_state.py ve validate_graph_state.py kalite kapilari regressions yakalamak icin kritik
+- alert_queue ve ranking metrics business value'nin cekirdegi; investigasyon etkisini bunlar olcuyor
+- graph_party_cluster_summary supheli topluluklarin executive anlatimi icin en yuksek onemli graph ciktisi
+- validate_bigquery_state artifact'i local ile analytical layer parity kanitidir
+- checkpoint snapshot ve dashboard bundle publish edilen sayilarin denetlenebilir olmasini saglar
+- Vertex analyst smoke artifact'i LLM katmaninin deterministic prompt-contract ile calistiginin kanitidir
+
+## 14. Bundan Sonra Ne Yapabiliriz?
+- Dashboard'i tarayicida calisip son mile polish ve responsive ince ayar yapmak
+- Looker Studio veya benzeri paylasim katmani ile BigQuery view uzerinden canli executive board kurmak
+- Gemini/Vertex AI analyst copilotu tek queue smoke'tan coklu queue batch ve dashboard drilldown seviyesine cikarmak
+- opsiyonel ikinci faz datasetleri ekleyip karsilastirmali modelleme yapmak
+- CI seviyesinde lokal smoke validation zinciri eklemek
+- Model explainability ve error analysis katmanini zenginlestirmek
+
+## 15. Kanit Artefaktlari
+- reports/03_Operational_Checkpoint_Snapshot.json
+- reports/03_Operational_Checkpoint_TR.pdf
+- artifacts/bigquery/validate-bigquery-state.json
+- artifacts/bigquery/validate-executive-sql-bundle.json
+- artifacts/dashboard/validate-dashboard-state.json
+- artifacts/graph/graph-build-summary-20260227T125935Z.json
+- artifacts/models/ranking/20260227T125836Z/ranking-summary.json
+- artifacts/models/fraud_scoring/20260227T125804Z/scoring-summary.json
+- artifacts/agent/casebook/latest/casebook.json
+- artifacts/agent/prompt_pack/latest/prompt-pack-summary.json
+- artifacts/agent/vertex_responses/latest/run-summary.json
+- data/warehouse/warehouse-build-summary.json
