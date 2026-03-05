@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-03-05T16:43:59Z",
+  "generated_at_utc": "2026-03-05T18:01:59Z",
   "baseline": {
     "metrics_path": "artifacts/models/fraud_baseline/latest/metrics.json",
     "ranking_path": "artifacts/models/ranking/latest/ranking-summary.json",
@@ -41,7 +41,7 @@
           "rows": 884807,
           "positive_rows": 10772,
           "positive_rate": 0.012174406395971098,
-          "average_precision": 0.05734098536383258,
+          "average_precision": 0.057340985363832586,
           "pr_auc_trapz": 0.05730945032894134
         }
       }
@@ -54,7 +54,7 @@
           "rows": 884807,
           "positive_rows": 10772,
           "positive_rate": 0.012174406395971098,
-          "average_precision": 0.06472778557131624,
+          "average_precision": 0.06472778557131621,
           "pr_auc_trapz": 0.06459306112235286
         }
       }
@@ -67,8 +67,8 @@
           "rows": 884807,
           "positive_rows": 10772,
           "positive_rate": 0.012174406395971098,
-          "average_precision": 0.15614986659640917,
-          "pr_auc_trapz": 0.1559717505548058
+          "average_precision": 0.1561498665964091,
+          "pr_auc_trapz": 0.15597175055480583
         }
       }
     }

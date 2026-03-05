@@ -1,10 +1,19 @@
-PYTHON := python3
+VENV_BIN := $(if $(wildcard .venv/bin/python),.venv/bin/,)
+PYTHON ?= $(if $(VENV_BIN),$(VENV_BIN)python,python3)
+RUFF ?= $(if $(wildcard .venv/bin/ruff),.venv/bin/ruff,ruff)
+BLACK ?= $(if $(wildcard .venv/bin/black),.venv/bin/black,black)
+PYTEST ?= $(if $(wildcard .venv/bin/pytest),.venv/bin/pytest,pytest)
+PIP_AUDIT ?= $(if $(wildcard .venv/bin/pip-audit),.venv/bin/pip-audit,pip-audit)
 GCP_KEY_PATH ?= .secrets/gcp-service-account.json
 GCP_PROJECT_ID ?= fraud-aml-graph
 BQ_DATASET ?= fraud_aml_graph_dev
 BQ_LOCATION ?= EU
 
-.PHONY: check-datasets validate-schema ingest-smoke ingest-core ingest-ibm-1m warehouse-smoke warehouse-core train-fraud-smoke train-fraud train-fraud-benchmark train-fraud-tree score-fraud-smoke score-fraud-benchmark score-fraud-tree build-queue-smoke build-queue-benchmark build-queue-tree validate-state cleanup-incomplete-dry-run cleanup-incomplete-apply graph-build graph-validate setup-gcp-local bq-test sqlite-to-bq-smoke sqlite-to-bq-core sqlite-to-bq-full sqlite-graph-to-bq bq-create-analytics bq-create-graph-analytics bq-create-executive-views validate-executive-sql bq-validate-executive-views validate-analyst-sql agent-casebook agent-casebook-validate agent-prompt-pack agent-prompt-pack-validate agent-vertex-smoke agent-vertex-validate agent-vertex-batch agent-vertex-batch-validate agent-prompt-eval vertex-to-bq bq-create-analyst-views bq-validate-analyst-views bq-analyst-check bq-run-validation-sql bq-validate-state bq-validate-graph-state bq-full-check bq-graph-check bq-refresh-from-local-full report-checkpoint dashboard-build dashboard-check report-briefing report-master report-master-en report-model-compare model-benchmark-pipeline tree-benchmark-pipeline tree-shap lint format-check test security-audit quality-local sample-generate sample-warehouse sample-train sample-score sample-queue sample-graph sample-validate sample-e2e
+.PHONY: setup-dev check-datasets validate-schema ingest-smoke ingest-core ingest-ibm-1m warehouse-smoke warehouse-core train-fraud-smoke train-fraud train-fraud-benchmark train-fraud-tree score-fraud-smoke score-fraud-benchmark score-fraud-tree build-queue-smoke build-queue-benchmark build-queue-tree validate-state cleanup-incomplete-dry-run cleanup-incomplete-apply graph-build graph-validate setup-gcp-local bq-test sqlite-to-bq-smoke sqlite-to-bq-core sqlite-to-bq-full sqlite-graph-to-bq bq-create-analytics bq-create-graph-analytics bq-create-executive-views validate-executive-sql bq-validate-executive-views validate-analyst-sql agent-casebook agent-casebook-validate agent-prompt-pack agent-prompt-pack-validate agent-vertex-smoke agent-vertex-validate agent-vertex-batch agent-vertex-batch-validate agent-prompt-eval vertex-to-bq bq-create-analyst-views bq-validate-analyst-views bq-analyst-check bq-run-validation-sql bq-validate-state bq-validate-graph-state bq-full-check bq-graph-check bq-refresh-from-local-full report-checkpoint dashboard-build dashboard-check report-briefing report-master report-master-en report-model-compare model-benchmark-pipeline tree-benchmark-pipeline tree-shap lint format-check test security-audit quality-local sample-generate sample-warehouse sample-train sample-score sample-queue sample-graph sample-validate sample-e2e
+
+setup-dev:
+	$(PYTHON) -m pip install --upgrade pip
+	$(PYTHON) -m pip install -r requirements-dev.txt
 
 check-datasets:
 	./scripts/check_dataset_layout.sh
@@ -190,16 +199,16 @@ tree-shap:
 	$(PYTHON) scripts/generate_tree_shap_summary.py --model-path artifacts/models/fraud_tree_benchmark/latest/model.pkl
 
 lint:
-	ruff check scripts tests
+	$(RUFF) check scripts tests
 
 format-check:
-	black --check scripts tests
+	$(BLACK) --check scripts tests
 
 test:
-	pytest
+	$(PYTEST)
 
 security-audit:
-	pip-audit -r requirements.txt --progress-spinner off
+	$(PIP_AUDIT) -r requirements.txt --progress-spinner off
 
 quality-local: lint format-check test
 

@@ -359,6 +359,8 @@ Muhendislik arac zinciri (test/lint/security/XAI):
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
+# esdeger kisayol
+make setup-dev
 ```
 
 Cloud script'lerinin bekledigi environment variable'lar:

@@ -357,6 +357,8 @@ Install engineering toolchain (tests/lint/security/XAI):
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
+# equivalent shortcut
+make setup-dev
 ```
 
 Environment variables expected by cloud scripts:
