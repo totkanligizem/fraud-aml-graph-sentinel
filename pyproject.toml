@@ -1,0 +1,15 @@
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["artifacts", "data/raw", "data/curated", "data/warehouse", "data/sample"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]

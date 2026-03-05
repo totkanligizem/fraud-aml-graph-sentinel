@@ -352,13 +352,13 @@ Ana Python bagimliliklarini kurulum:
 
 ```bash
 python3 -m pip install --upgrade pip
-python3 -m pip install numpy pandas matplotlib google-cloud-bigquery google-auth google-genai
+python3 -m pip install -r requirements.txt
 ```
 
-Opsiyonel benchmark bagimliligi:
+Muhendislik arac zinciri (test/lint/security/XAI):
 
 ```bash
-python3 -m pip install scikit-learn
+python3 -m pip install -r requirements-dev.txt
 ```
 
 Cloud script'lerinin bekledigi environment variable'lar:
@@ -377,6 +377,10 @@ Fraud - AML Graph/
 ├── Makefile
 ├── README.md
 ├── README.tr.md
+├── requirements.txt
+├── requirements-dev.txt
+├── requirements.lock
+├── pyproject.toml
 ├── dashboard/
 │   ├── index.html
 │   ├── app.js
@@ -414,6 +418,9 @@ Fraud - AML Graph/
 │       ├── analyst_validation/
 │       └── validation/
 ├── docs/
+├── schemas/
+│   └── transaction_event.schema.json
+├── tests/
 ├── reports/
 └── artifacts/        # run summary, model ciktilari, rapor kanitlari
 ```
@@ -424,6 +431,7 @@ Fraud - AML Graph/
 
 ```bash
 make check-datasets
+make validate-schema
 make ingest-core
 make warehouse-core
 make train-fraud
@@ -458,6 +466,7 @@ make bq-validate-graph-state
 make agent-casebook-validate
 make agent-prompt-pack-validate
 make agent-vertex-batch-validate
+make agent-prompt-eval
 make vertex-to-bq
 make bq-analyst-check
 ```
@@ -487,6 +496,13 @@ Opsiyonel tree benchmark:
 
 ```bash
 make tree-benchmark-pipeline
+make tree-shap
+```
+
+Muhendislik kalite paketi:
+
+```bash
+make quality-local
 ```
 
 ### 11.7 Reproducible Sample Smoke Pipeline
@@ -543,6 +559,7 @@ Validation yaklasimi explicit ve script-driven'dir; implicit degildir.
   - quality panel muhasebe tutarliligi
   - evidence artifact varlik kontrolleri
   - HTML/JS binding tutarliligi ve CSS design token kontrolleri
+  - drift panel sozlesmesi (`PSI`, `KS`, queue stability Jaccard)
 
 ### Agent output gate'leri
 
@@ -550,11 +567,22 @@ Validation yaklasimi explicit ve script-driven'dir; implicit degildir.
   - response sayisi ve dataset cesitliligi kontrolleri
   - runtime ve schema hata kontrolleri
   - zorunlu structured alanlar ve dosya-seviyesi kanit kontrolleri
+  - prompt contract kontrolleri (versioned payload policy + masking)
 
 ### CI smoke kontrolleri
 
 - GitHub Actions workflow: `.github/workflows/smoke-sample.yml`
 - Her push ve pull request'te `make sample-e2e` calistirarak reproducibility regression kontrolu yapar.
+
+### CI quality gate'leri
+
+- GitHub Actions workflow: `.github/workflows/quality-gates.yml`
+- Su adimlari calistirir:
+  - `ruff check scripts tests`
+  - `black --check scripts tests`
+  - `pytest`
+  - `python -m compileall scripts`
+  - `pip-audit -r requirements.txt` (bilgilendirici, non-blocking)
 
 ## 13. Guncel Sonuc Ozeti
 
@@ -620,15 +648,26 @@ Acilis adresi:
 - Fraud+AML icin tam bir data-to-decision pipeline kuruldu.
 - Graph intelligence ve queue-level onceliklendirme eklendi.
 - Leakage-safe graph interaction feature'lari fraud model train/score hattina entegre edildi.
+- `label_type` sozlesmesi (`fraud` / `aml` / `unknown`) ve subtask metrik yolu eklendi.
+- `feature_asof_ts` kolonlari ve as-of leakage validator kontrolleri eklendi.
 - Gemini tabanli analyst copilot, validation ve BigQuery entegrasyonuyla calisir hale getirildi.
+- Analyst prompt governance (`prompt_version`, payload policy version, allowlist+masking) eklendi.
+- Analyst runtime izlenebilirligi icin JSONL audit log (`audit-log.jsonl`) eklendi.
+- Drift izleme paneli (`PSI`, bucketed `KS`, top-20 queue Jaccard) eklendi.
+- Tree benchmark icin opsiyonel SHAP explainability hattı eklendi (`make tree-shap`).
 - Guclu kalite kapilari ve publish kriterleri tanimlandi.
 - Profesyonel dashboard ve TR/EN rapor ciktilari uretildi.
+
+### Publish workflow'lari
+
+- Dashboard Pages workflow: `.github/workflows/pages-dashboard.yml`
+- `main` push sonrasinda statik `dashboard/` bundle'ini GitHub Pages'e deploy eder.
 
 ### Yuksek etki potansiyelli sonraki adimlar
 
 1. Mevcut leakage-safe graph interaction'larin uzerine daha zengin supervised graph feature'lari (ornegin centrality/community embedding) eklemek.
-2. Dataset bazinda model calibration ve drift monitoring katmani eklemek.
-3. Her commit icin CI pipeline (lint + smoke + validator suite) genisletmek.
+2. Dataset bazinda calibration katmanini daha da derinlestirmek (drift paneli eklendi, advanced thresholds genisletilebilir).
+3. CI pipeline'i (lint + smoke + validator suite) branch politikalarina gore zorunlu hale getirmek.
 4. Senaryo simulasyonu ve what-if queue stress test katmani eklemek.
 5. Analist aksiyonlarini retraining dongusune geri besleyen human-in-the-loop mekanizmasi eklemek.
 

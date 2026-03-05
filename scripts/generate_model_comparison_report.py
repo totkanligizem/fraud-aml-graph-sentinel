@@ -5,9 +5,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
+
+import numpy as np
+
+from train_fraud_baseline_numpy import average_precision_score_np, pr_auc_trapz
 
 
 def parse_args() -> argparse.Namespace:
@@ -152,6 +157,73 @@ def feature_count(payload: Dict[str, Any] | None) -> int | None:
     return None
 
 
+def table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name = ? LIMIT 1",
+        [table_name],
+    ).fetchone()
+    return bool(row)
+
+
+def normalize_label_type(dataset_id: str, label_type: Any) -> str:
+    value = str(label_type or "").strip().lower()
+    if value in {"fraud", "aml", "unknown"}:
+        return value
+    if dataset_id == "ibm_aml_data":
+        return "aml"
+    return "fraud"
+
+
+def compute_subtask_metrics(db_path: str, score_table: str) -> Dict[str, Any]:
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        if not table_exists(conn, score_table):
+            return {"available": False, "reason": f"missing table: {score_table}", "by_label_type": {}}
+
+        rows = conn.execute(
+            f"""
+            SELECT
+              s.dataset_id,
+              COALESCE(tm.label_type, '') AS label_type,
+              COALESCE(s.label_fraud, tm.label_fraud) AS label_fraud,
+              s.fraud_score
+            FROM {score_table} s
+            LEFT JOIN transaction_mart tm
+              ON tm.event_id = s.event_id
+            WHERE s.fraud_score IS NOT NULL
+              AND COALESCE(s.label_fraud, tm.label_fraud) IS NOT NULL
+            """
+        ).fetchall()
+        if not rows:
+            return {"available": False, "reason": "no scored rows with labels", "by_label_type": {}}
+
+        grouped: Dict[str, Dict[str, List[float]]] = {}
+        for row in rows:
+            dataset_id = str(row["dataset_id"] or "")
+            label_type = normalize_label_type(dataset_id, row["label_type"])
+            grouped.setdefault(label_type, {"y": [], "score": []})
+            grouped[label_type]["y"].append(float(row["label_fraud"]))
+            grouped[label_type]["score"].append(float(row["fraud_score"]))
+
+        by_label_type: Dict[str, Any] = {}
+        for label_type, values in grouped.items():
+            y = np.asarray(values["y"], dtype=np.float64)
+            score = np.asarray(values["score"], dtype=np.float64)
+            if y.size == 0:
+                continue
+            by_label_type[label_type] = {
+                "rows": int(y.size),
+                "positive_rows": int(np.sum(y == 1)),
+                "positive_rate": float(np.mean(y)),
+                "average_precision": float(average_precision_score_np(y, score)),
+                "pr_auc_trapz": float(pr_auc_trapz(y, score)),
+            }
+        return {"available": True, "reason": "", "by_label_type": by_label_type}
+    finally:
+        conn.close()
+
+
 def main() -> None:
     args = parse_args()
     expected_db_path = args.expected_db_path
@@ -208,6 +280,9 @@ def main() -> None:
     tree_roc_cal = safe_get(tree_metrics, "metrics_calibrated", "roc_auc") if tree_metrics else None
     tree_p50 = safe_get(tree_ranking, "mean_precision_at_k") if tree_ranking else None
     tree_ndcg50 = safe_get(tree_ranking, "mean_ndcg_at_k") if tree_ranking else None
+    subtask_baseline = compute_subtask_metrics(expected_db_path, "fraud_scores")
+    subtask_benchmark = compute_subtask_metrics(expected_db_path, "fraud_scores_benchmark")
+    subtask_tree = compute_subtask_metrics(expected_db_path, "fraud_scores_tree")
 
     summary = {
         "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -242,6 +317,11 @@ def main() -> None:
             "roc_auc_calibrated": tree_roc_cal,
             "mean_precision_at_50": tree_p50,
             "mean_ndcg_at_50": tree_ndcg50,
+        },
+        "subtask_evaluation": {
+            "baseline": subtask_baseline,
+            "benchmark": subtask_benchmark,
+            "tree_benchmark": subtask_tree,
         },
         "deltas": {
             "ap_delta_calibrated_vs_baseline": None if base_ap is None or bench_ap_cal is None else bench_ap_cal - base_ap,
@@ -310,6 +390,35 @@ def main() -> None:
 
     lines.extend(
         [
+        "## Subtask Evaluation (label_type)",
+        "",
+        "| Layer | label_type | Rows | Positive rate | AP | PR-AUC |",
+        "|---|---|---:|---:|---:|---:|",
+        ]
+    )
+
+    for layer_name, block in [
+        ("Baseline", subtask_baseline),
+        ("Benchmark", subtask_benchmark),
+        ("Tree", subtask_tree),
+    ]:
+        if not block.get("available"):
+            lines.append(f"| {layer_name} | n/a | 0 | n/a | n/a | n/a |")
+            continue
+        by_label_type = block.get("by_label_type", {})
+        if not by_label_type:
+            lines.append(f"| {layer_name} | n/a | 0 | n/a | n/a | n/a |")
+            continue
+        for label_type in sorted(by_label_type.keys()):
+            row = by_label_type[label_type]
+            lines.append(
+                f"| {layer_name} | {label_type} | {int(row['rows'])} | {fmt(row['positive_rate'])} | "
+                f"{fmt(row['average_precision'])} | {fmt(row['pr_auc_trapz'])} |"
+            )
+
+    lines.extend(
+        [
+        "",
         "## Notes",
         "",
         "- Benchmark model: interaction-augmented numpy logistic regression with Platt calibration.",

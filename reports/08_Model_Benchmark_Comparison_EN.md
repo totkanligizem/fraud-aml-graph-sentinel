@@ -1,6 +1,6 @@
 # Model Benchmark Comparison (EN)
 
-Generated at (UTC): 2026-03-05T15:32:52Z
+Generated at (UTC): 2026-03-05T16:43:59Z
 
 ## Baseline vs Benchmark
 
@@ -26,6 +26,14 @@ Generated at (UTC): 2026-03-05T15:32:52Z
 | ROC-AUC | n/a | 0.904592 | n/a |
 | Mean Precision@50 | 0.069091 | 0.270682 | 0.201591 |
 | Mean NDCG@50 | 0.069647 | 0.298313 | 0.228666 |
+
+## Subtask Evaluation (label_type)
+
+| Layer | label_type | Rows | Positive rate | AP | PR-AUC |
+|---|---|---:|---:|---:|---:|
+| Baseline | fraud | 884807 | 0.012174 | 0.057341 | 0.057309 |
+| Benchmark | fraud | 884807 | 0.012174 | 0.064728 | 0.064593 |
+| Tree | fraud | 884807 | 0.012174 | 0.156150 | 0.155972 |
 
 ## Notes
 

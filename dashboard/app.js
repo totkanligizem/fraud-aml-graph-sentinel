@@ -158,6 +158,7 @@ function renderSignalBand() {
     data.quality.unresolved_checks > 0 ? `${fmtInt.format(data.quality.unresolved_checks)} unresolved remote checks` : "Remote quality fully resolved",
     `${fmtInt.format(data.kpis.queue_count)} active investigation queues`,
     `Threshold ${fmtDecimal3.format(data.kpis.threshold)} with AP ${fmtDecimal3.format(data.kpis.average_precision)}`,
+    `Drift status ${String(data.drift?.status || "n/a").toUpperCase()}`,
   ];
   $("control-posture").innerHTML = controlItems.map((item) => `<span class="signal-pill">${escapeHtml(item)}</span>`).join("");
 
@@ -625,6 +626,55 @@ function renderRanking() {
     .join("");
 }
 
+function renderDrift() {
+  const drift = data.drift || {};
+  if (!drift.available) {
+    $("drift-stats").innerHTML = `
+      <article class="stat-card">
+        <div class="stat-label">Status</div>
+        <span class="stat-value">n/a</span>
+        <div class="metric-copy">${escapeHtml(drift.note || "Not enough scored history for drift metrics.")}</div>
+      </article>
+    `;
+    return;
+  }
+
+  const windowLabel = `${formatDateShort(drift.current_window?.start_date)} to ${formatDateShort(drift.current_window?.end_date)}`;
+  const queueJaccard = drift.queue_jaccard_top20 == null ? "n/a" : fmtPct2.format(drift.queue_jaccard_top20);
+  $("drift-stats").innerHTML = [
+    {
+      label: "Status",
+      value: String(drift.status || "unknown").toUpperCase(),
+      copy: "Combined PSI/KS and queue-overlap signal.",
+    },
+    {
+      label: "Score PSI",
+      value: fmtDecimal3.format(drift.score_psi || 0),
+      copy: "Population Stability Index over score buckets.",
+    },
+    {
+      label: "Score KS",
+      value: fmtDecimal3.format(drift.score_ks || 0),
+      copy: "Cumulative distribution shift across score buckets.",
+    },
+    {
+      label: "Top-20 queue Jaccard",
+      value: queueJaccard,
+      copy: `Current window ${windowLabel}`,
+    },
+  ]
+    .map(
+      (item) => `
+        <article class="stat-card">
+          <div class="stat-label">${escapeHtml(item.label)}</div>
+          <span class="stat-value">${escapeHtml(item.value)}</span>
+          <div class="metric-copy">${escapeHtml(item.copy)}</div>
+        </article>
+      `
+    )
+    .join("");
+}
+
 function renderPipeline() {
   $("pipeline-list").innerHTML = data.pipeline_steps
     .map(
@@ -847,6 +897,7 @@ function render() {
   renderDatasetTable();
   renderBuckets();
   renderRanking();
+  renderDrift();
   renderPipeline();
   renderFeatures();
   renderClusters();

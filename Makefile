@@ -4,10 +4,13 @@ GCP_PROJECT_ID ?= fraud-aml-graph
 BQ_DATASET ?= fraud_aml_graph_dev
 BQ_LOCATION ?= EU
 
-.PHONY: check-datasets ingest-smoke ingest-core ingest-ibm-1m warehouse-smoke warehouse-core train-fraud-smoke train-fraud train-fraud-benchmark train-fraud-tree score-fraud-smoke score-fraud-benchmark score-fraud-tree build-queue-smoke build-queue-benchmark build-queue-tree validate-state cleanup-incomplete-dry-run cleanup-incomplete-apply graph-build graph-validate setup-gcp-local bq-test sqlite-to-bq-smoke sqlite-to-bq-core sqlite-to-bq-full sqlite-graph-to-bq bq-create-analytics bq-create-graph-analytics bq-create-executive-views validate-executive-sql bq-validate-executive-views validate-analyst-sql agent-casebook agent-casebook-validate agent-prompt-pack agent-prompt-pack-validate agent-vertex-smoke agent-vertex-validate agent-vertex-batch agent-vertex-batch-validate vertex-to-bq bq-create-analyst-views bq-validate-analyst-views bq-analyst-check bq-run-validation-sql bq-validate-state bq-validate-graph-state bq-full-check bq-graph-check bq-refresh-from-local-full report-checkpoint dashboard-build dashboard-check report-briefing report-master report-master-en report-model-compare model-benchmark-pipeline tree-benchmark-pipeline sample-generate sample-warehouse sample-train sample-score sample-queue sample-graph sample-validate sample-e2e
+.PHONY: check-datasets validate-schema ingest-smoke ingest-core ingest-ibm-1m warehouse-smoke warehouse-core train-fraud-smoke train-fraud train-fraud-benchmark train-fraud-tree score-fraud-smoke score-fraud-benchmark score-fraud-tree build-queue-smoke build-queue-benchmark build-queue-tree validate-state cleanup-incomplete-dry-run cleanup-incomplete-apply graph-build graph-validate setup-gcp-local bq-test sqlite-to-bq-smoke sqlite-to-bq-core sqlite-to-bq-full sqlite-graph-to-bq bq-create-analytics bq-create-graph-analytics bq-create-executive-views validate-executive-sql bq-validate-executive-views validate-analyst-sql agent-casebook agent-casebook-validate agent-prompt-pack agent-prompt-pack-validate agent-vertex-smoke agent-vertex-validate agent-vertex-batch agent-vertex-batch-validate agent-prompt-eval vertex-to-bq bq-create-analyst-views bq-validate-analyst-views bq-analyst-check bq-run-validation-sql bq-validate-state bq-validate-graph-state bq-full-check bq-graph-check bq-refresh-from-local-full report-checkpoint dashboard-build dashboard-check report-briefing report-master report-master-en report-model-compare model-benchmark-pipeline tree-benchmark-pipeline tree-shap lint format-check test security-audit quality-local sample-generate sample-warehouse sample-train sample-score sample-queue sample-graph sample-validate sample-e2e
 
 check-datasets:
 	./scripts/check_dataset_layout.sh
+
+validate-schema:
+	$(PYTHON) scripts/validate_transaction_event_schema.py
 
 ingest-smoke:
 	$(PYTHON) scripts/ingest_canonical.py --dataset all --max-rows 1000 --chunksize 50000
@@ -129,6 +132,9 @@ agent-vertex-batch: agent-prompt-pack
 agent-vertex-batch-validate: agent-vertex-batch
 	$(PYTHON) scripts/validate_vertex_analyst_outputs.py --output-dir artifacts/agent/vertex_responses/last --min-response-count 3 --min-dataset-count 3
 
+agent-prompt-eval:
+	$(PYTHON) scripts/evaluate_vertex_prompt_quality.py
+
 vertex-to-bq:
 	$(PYTHON) scripts/vertex_outputs_to_bigquery.py
 
@@ -179,6 +185,23 @@ report-model-compare:
 model-benchmark-pipeline: train-fraud-benchmark score-fraud-benchmark build-queue-benchmark report-model-compare
 
 tree-benchmark-pipeline: train-fraud-tree score-fraud-tree build-queue-tree report-model-compare
+
+tree-shap:
+	$(PYTHON) scripts/generate_tree_shap_summary.py --model-path artifacts/models/fraud_tree_benchmark/latest/model.pkl
+
+lint:
+	ruff check scripts tests
+
+format-check:
+	black --check scripts tests
+
+test:
+	pytest
+
+security-audit:
+	pip-audit -r requirements.txt --progress-spinner off
+
+quality-local: lint format-check test
 
 sample-generate:
 	$(PYTHON) scripts/generate_synthetic_sample_data.py --output-root data/sample/transaction_event --rows-per-dataset 2500

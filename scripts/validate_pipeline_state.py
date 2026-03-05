@@ -176,6 +176,11 @@ def main() -> None:
                         "SELECT COUNT(*) FROM transaction_mart WHERE label_aml IS NOT NULL AND label_aml NOT IN (0, 1)"
                     ).fetchone()[0]
                 ),
+                "invalid_label_type_transaction_mart": int(
+                    cur.execute(
+                        "SELECT COUNT(*) FROM transaction_mart WHERE label_type NOT IN ('fraud', 'aml', 'unknown')"
+                    ).fetchone()[0]
+                ),
                 "shared_party_account_ids_transaction_mart": int(
                     cur.execute(
                         """
@@ -203,6 +208,28 @@ def main() -> None:
                            OR graph_pair_txn_count_30d < 0
                            OR graph_pair_amt_sum_30d < 0
                            OR graph_reciprocal_pair_txn_count_30d < 0
+                        """
+                    ).fetchone()[0]
+                ),
+                "feature_payer_24h_invalid_asof": int(
+                    cur.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM feature_payer_24h
+                        WHERE feature_asof_ts IS NULL
+                           OR event_time IS NULL
+                           OR feature_asof_ts > event_time
+                        """
+                    ).fetchone()[0]
+                ),
+                "feature_graph_24h_invalid_asof": int(
+                    cur.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM feature_graph_24h
+                        WHERE feature_asof_ts IS NULL
+                           OR event_time IS NULL
+                           OR feature_asof_ts > event_time
                         """
                     ).fetchone()[0]
                 ),

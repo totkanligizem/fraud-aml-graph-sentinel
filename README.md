@@ -350,13 +350,13 @@ Install core Python dependencies:
 
 ```bash
 python3 -m pip install --upgrade pip
-python3 -m pip install numpy pandas matplotlib google-cloud-bigquery google-auth google-genai
+python3 -m pip install -r requirements.txt
 ```
 
-Optional benchmark dependency:
+Install engineering toolchain (tests/lint/security/XAI):
 
 ```bash
-python3 -m pip install scikit-learn
+python3 -m pip install -r requirements-dev.txt
 ```
 
 Environment variables expected by cloud scripts:
@@ -374,6 +374,10 @@ export GOOGLE_APPLICATION_CREDENTIALS="/absolute/path/to/your/service-account.js
 Fraud - AML Graph/
 ├── Makefile
 ├── README.md
+├── requirements.txt
+├── requirements-dev.txt
+├── requirements.lock
+├── pyproject.toml
 ├── dashboard/
 │   ├── index.html
 │   ├── app.js
@@ -411,6 +415,9 @@ Fraud - AML Graph/
 │       ├── analyst_validation/
 │       └── validation/
 ├── docs/
+├── schemas/
+│   └── transaction_event.schema.json
+├── tests/
 ├── reports/
 └── artifacts/        # run summaries, model outputs, report evidence
 ```
@@ -421,6 +428,7 @@ Fraud - AML Graph/
 
 ```bash
 make check-datasets
+make validate-schema
 make ingest-core
 make warehouse-core
 make train-fraud
@@ -455,6 +463,7 @@ make bq-validate-graph-state
 make agent-casebook-validate
 make agent-prompt-pack-validate
 make agent-vertex-batch-validate
+make agent-prompt-eval
 make vertex-to-bq
 make bq-analyst-check
 ```
@@ -484,6 +493,13 @@ Optional tree benchmark:
 
 ```bash
 make tree-benchmark-pipeline
+make tree-shap
+```
+
+Engineering quality suite:
+
+```bash
+make quality-local
 ```
 
 ### 11.7 Reproducible Sample Smoke Pipeline
@@ -540,6 +556,7 @@ Validation is explicit and script-driven, not implicit.
   - quality panel accounting integrity
   - evidence artifact existence checks
   - HTML/JS binding consistency and CSS design tokens
+  - drift panel contract (`PSI`, `KS`, queue stability Jaccard)
 
 ### Agent output gates
 
@@ -547,11 +564,22 @@ Validation is explicit and script-driven, not implicit.
   - response count and dataset diversity
   - runtime and schema error checks
   - mandatory structured fields and file-level evidence checks
+  - prompt contract checks (versioned payload policy + masking)
 
 ### CI smoke checks
 
 - GitHub Actions workflow: `.github/workflows/smoke-sample.yml`
 - Executes `make sample-e2e` on push and pull requests for reproducibility regression control.
+
+### CI quality gates
+
+- GitHub Actions workflow: `.github/workflows/quality-gates.yml`
+- Runs:
+  - `ruff check scripts tests`
+  - `black --check scripts tests`
+  - `pytest`
+  - `python -m compileall scripts`
+  - `pip-audit -r requirements.txt` (non-blocking advisory step)
 
 ## 13. Current Results Snapshot
 
@@ -617,9 +645,20 @@ Open:
 - Built a complete fraud+AML data-to-decision pipeline.
 - Added graph intelligence and queue-level prioritization.
 - Integrated leakage-safe graph interaction features into fraud model training/scoring.
+- Added `label_type` contract (`fraud` / `aml` / `unknown`) and subtask metric reporting path.
+- Added `feature_asof_ts` columns and strict as-of validation gates for leakage control.
 - Added Gemini-based analyst copilot with validation and BigQuery integration.
+- Added analyst prompt governance (`prompt_version`, payload policy version, allowlist+masking contract).
+- Added analyst runtime JSONL audit log (`audit-log.jsonl`) for traceability.
+- Added drift monitoring panel (`PSI`, bucketed `KS`, top-20 queue Jaccard stability).
+- Added optional SHAP explainability pipeline for tree benchmark (`make tree-shap`).
 - Added strong quality gates and publish criteria.
 - Produced professional dashboard and full TR/EN reporting outputs.
+
+### Publish workflows
+
+- Dashboard Pages workflow: `.github/workflows/pages-dashboard.yml`
+- On `main` push, deploys static `dashboard/` bundle to GitHub Pages.
 
 ### High-impact next extensions
 

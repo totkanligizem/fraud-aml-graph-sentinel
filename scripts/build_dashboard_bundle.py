@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -292,6 +293,179 @@ def build_queue_highlights(conn: sqlite3.Connection) -> Dict[str, List[Dict[str,
     return out
 
 
+def compute_psi(ref_counts: List[int], cur_counts: List[int], epsilon: float = 1e-6) -> float:
+    ref_total = max(sum(ref_counts), 1)
+    cur_total = max(sum(cur_counts), 1)
+    psi = 0.0
+    for ref_count, cur_count in zip(ref_counts, cur_counts):
+        ref_ratio = max(ref_count / ref_total, epsilon)
+        cur_ratio = max(cur_count / cur_total, epsilon)
+        psi += (cur_ratio - ref_ratio) * math.log(cur_ratio / ref_ratio)
+    return float(psi)
+
+
+def compute_bucket_ks(ref_counts: List[int], cur_counts: List[int]) -> float:
+    ref_total = max(sum(ref_counts), 1)
+    cur_total = max(sum(cur_counts), 1)
+    ref_cum = 0.0
+    cur_cum = 0.0
+    max_diff = 0.0
+    for ref_count, cur_count in zip(ref_counts, cur_counts):
+        ref_cum += ref_count / ref_total
+        cur_cum += cur_count / cur_total
+        max_diff = max(max_diff, abs(cur_cum - ref_cum))
+    return float(max_diff)
+
+
+def build_drift_panel(conn: sqlite3.Connection) -> Dict[str, Any]:
+    day_rows = fetch_rows(
+        conn,
+        """
+        SELECT DISTINCT date(event_time) AS event_date
+        FROM fraud_scores
+        WHERE event_time IS NOT NULL
+        ORDER BY event_date
+        """,
+    )
+    scored_days = [str(row["event_date"]) for row in day_rows if row.get("event_date")]
+    if len(scored_days) < 4:
+        return {
+            "available": False,
+            "status": "insufficient_history",
+            "note": "Need at least 4 scored days to compute PSI/KS and queue stability.",
+            "score_psi": None,
+            "score_ks": None,
+            "queue_jaccard_top20": None,
+            "reference_window": {},
+            "current_window": {},
+        }
+
+    split_idx = len(scored_days) // 2
+    ref_start = scored_days[0]
+    ref_end = scored_days[split_idx - 1]
+    cur_start = scored_days[split_idx]
+    cur_end = scored_days[-1]
+
+    hist_rows = fetch_rows(
+        conn,
+        f"""
+        WITH scored AS (
+          SELECT
+            date(event_time) AS event_date,
+            CASE
+              WHEN fraud_score >= 0.9 THEN 10
+              WHEN fraud_score >= 0.8 THEN 9
+              WHEN fraud_score >= 0.7 THEN 8
+              WHEN fraud_score >= 0.6 THEN 7
+              WHEN fraud_score >= 0.5 THEN 6
+              WHEN fraud_score >= 0.4 THEN 5
+              WHEN fraud_score >= 0.3 THEN 4
+              WHEN fraud_score >= 0.2 THEN 3
+              WHEN fraud_score >= 0.1 THEN 2
+              ELSE 1
+            END AS bucket_id
+          FROM fraud_scores
+        )
+        SELECT
+          bucket_id,
+          SUM(CASE WHEN event_date BETWEEN '{ref_start}' AND '{ref_end}' THEN 1 ELSE 0 END) AS ref_count,
+          SUM(CASE WHEN event_date BETWEEN '{cur_start}' AND '{cur_end}' THEN 1 ELSE 0 END) AS cur_count
+        FROM scored
+        GROUP BY bucket_id
+        ORDER BY bucket_id
+        """,
+    )
+    ref_counts = [int(row.get("ref_count", 0)) for row in hist_rows]
+    cur_counts = [int(row.get("cur_count", 0)) for row in hist_rows]
+
+    score_psi = compute_psi(ref_counts, cur_counts)
+    score_ks = compute_bucket_ks(ref_counts, cur_counts)
+
+    queue_day_rows = fetch_rows(
+        conn,
+        """
+        SELECT DISTINCT event_date
+        FROM alert_queue
+        WHERE event_date IS NOT NULL
+        ORDER BY event_date DESC
+        LIMIT 2
+        """,
+    )
+    queue_days = [str(row["event_date"]) for row in queue_day_rows if row.get("event_date")]
+    queue_jaccard = None
+    if len(queue_days) == 2:
+        latest_day = queue_days[0]
+        prev_day = queue_days[1]
+        latest_rows = fetch_rows(
+            conn,
+            f"""
+            SELECT queue_id
+            FROM (
+              SELECT queue_id, AVG(fraud_score) AS avg_score
+              FROM alert_queue
+              WHERE event_date = '{latest_day}'
+              GROUP BY queue_id
+              ORDER BY avg_score DESC, queue_id
+              LIMIT 20
+            )
+            """,
+        )
+        prev_rows = fetch_rows(
+            conn,
+            f"""
+            SELECT queue_id
+            FROM (
+              SELECT queue_id, AVG(fraud_score) AS avg_score
+              FROM alert_queue
+              WHERE event_date = '{prev_day}'
+              GROUP BY queue_id
+              ORDER BY avg_score DESC, queue_id
+              LIMIT 20
+            )
+            """,
+        )
+        latest_set = {str(row["queue_id"]) for row in latest_rows}
+        prev_set = {str(row["queue_id"]) for row in prev_rows}
+        union_count = len(latest_set | prev_set)
+        queue_jaccard = (len(latest_set & prev_set) / union_count) if union_count else 1.0
+
+    if score_psi < 0.10 and score_ks < 0.10 and (queue_jaccard is None or queue_jaccard >= 0.40):
+        status = "stable"
+    elif score_psi < 0.25 and score_ks < 0.20 and (queue_jaccard is None or queue_jaccard >= 0.20):
+        status = "watch"
+    else:
+        status = "alert"
+
+    return {
+        "available": True,
+        "status": status,
+        "note": "Population drift over score distributions and daily top-20 queue overlap.",
+        "score_psi": float(score_psi),
+        "score_ks": float(score_ks),
+        "queue_jaccard_top20": None if queue_jaccard is None else float(queue_jaccard),
+        "reference_window": {
+            "start_date": ref_start,
+            "end_date": ref_end,
+            "day_count": split_idx,
+            "row_count": int(sum(ref_counts)),
+        },
+        "current_window": {
+            "start_date": cur_start,
+            "end_date": cur_end,
+            "day_count": len(scored_days) - split_idx,
+            "row_count": int(sum(cur_counts)),
+        },
+        "thresholds": {
+            "psi_watch": 0.10,
+            "psi_alert": 0.25,
+            "ks_watch": 0.10,
+            "ks_alert": 0.20,
+            "queue_jaccard_watch": 0.40,
+            "queue_jaccard_alert": 0.20,
+        },
+    }
+
+
 def build_graph_panels(conn: sqlite3.Connection) -> Dict[str, List[Dict[str, Any]]]:
     top_nodes = fetch_rows(
         conn,
@@ -538,6 +712,7 @@ def build_dashboard_payload(snapshot: Dict[str, Any]) -> Dict[str, Any]:
         score_buckets = build_score_buckets(conn)
         queue_highlights = build_queue_highlights(conn)
         graph_panels = build_graph_panels(conn)
+        drift = build_drift_panel(conn)
 
     quality = build_quality_panels(snapshot)
     kpis = build_kpis(snapshot, dataset_breakdown, score_buckets, quality)
@@ -566,6 +741,7 @@ def build_dashboard_payload(snapshot: Dict[str, Any]) -> Dict[str, Any]:
         "score_buckets": score_buckets,
         "queue_highlights": queue_highlights,
         "graph_panels": graph_panels,
+        "drift": drift,
         "analyst": analyst,
         "pipeline_steps": build_pipeline_steps(snapshot),
         "top_features": snapshot["top_features"],

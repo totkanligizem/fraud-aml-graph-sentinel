@@ -31,6 +31,27 @@ SYSTEM_FALLBACK = (
     "Work only from supplied evidence and return compact audit-friendly JSON."
 )
 
+ALLOWED_CASE_PACKET_KEYS = {
+    "queue_id",
+    "dataset_id",
+    "event_date",
+    "queue_metrics",
+    "surface",
+    "top_events",
+    "party_watchlist",
+    "cluster_watchlist",
+    "evidence_notes",
+}
+BLOCKED_SENSITIVE_KEYS = {
+    "payer_account_id",
+    "payee_account_id",
+    "email_domain",
+    "ip_prefix",
+    "device_id",
+    "payer_party_id",
+    "payee_party_id",
+}
+
 
 class ModelOutputError(RuntimeError):
     def __init__(self, message: str, raw_text: str = "") -> None:
@@ -248,6 +269,13 @@ def extract_text_or_empty(response: Any) -> str:
         return ""
 
 
+def second_message_char_count(prompt_payload: Dict[str, Any]) -> int:
+    messages = prompt_payload.get("messages", [])
+    if not isinstance(messages, list) or len(messages) < 2:
+        return 0
+    return len(str(messages[1].get("content", "")))
+
+
 def extract_json_payload(text: str) -> Dict[str, Any]:
     cleaned = text.strip()
     try:
@@ -434,6 +462,51 @@ def build_compact_prompt_payload(prompt_payload: Dict[str, Any]) -> Dict[str, An
     compact_payload = dict(prompt_payload)
     compact_payload["messages"] = compact_messages
     return compact_payload
+
+
+def validate_prompt_payload_contract(prompt_payload: Dict[str, Any]) -> List[str]:
+    errors: List[str] = []
+    if not str(prompt_payload.get("prompt_version", "")).strip():
+        errors.append("missing prompt_version")
+    if not str(prompt_payload.get("payload_policy_version", "")).strip():
+        errors.append("missing payload_policy_version")
+    if not bool(prompt_payload.get("masking_applied", False)):
+        errors.append("masking_applied must be true")
+
+    messages = prompt_payload.get("messages")
+    if not isinstance(messages, list) or len(messages) < 2:
+        errors.append("messages must contain at least system and user entries")
+        return errors
+
+    user_content = str(messages[1].get("content", ""))
+    if not user_content:
+        errors.append("user message content is empty")
+        return errors
+
+    lowered_payload = user_content.lower()
+    for blocked in BLOCKED_SENSITIVE_KEYS:
+        if f"\"{blocked.lower()}\"" in lowered_payload:
+            errors.append(f"blocked sensitive field present in user payload: {blocked}")
+
+    try:
+        user_payload = json.loads(user_content)
+    except Exception:
+        errors.append("user payload is not valid JSON")
+        return errors
+
+    if not isinstance(user_payload, dict):
+        errors.append("user payload must be a JSON object")
+        return errors
+
+    case_packet = user_payload.get("case_packet")
+    if not isinstance(case_packet, dict):
+        errors.append("case_packet must be an object")
+        return errors
+
+    unknown_keys = sorted(set(case_packet.keys()) - ALLOWED_CASE_PACKET_KEYS)
+    if unknown_keys:
+        errors.append(f"case_packet contains non-allowlisted keys: {', '.join(unknown_keys)}")
+    return errors
 
 
 def run_model_call(
@@ -655,6 +728,7 @@ def run_model_call_with_retry(
     max_output_tokens: int,
     max_attempts: int = 3,
 ) -> Tuple[str, Dict[str, Any], str]:
+    compact_payload = build_compact_prompt_payload(prompt_payload)
     last_error: Exception | None = None
     last_raw_text = ""
     for attempt in range(1, max_attempts + 1):
@@ -662,7 +736,7 @@ def run_model_call_with_retry(
             raw_text, parsed = run_model_call(
                 client=client,
                 model_name=model_name,
-                prompt_payload=prompt_payload,
+                prompt_payload=compact_payload,
                 temperature=temperature,
                 max_output_tokens=max_output_tokens,
             )
@@ -672,7 +746,7 @@ def run_model_call_with_retry(
             retry_text, retry_parsed = run_model_call(
                 client=client,
                 model_name=model_name,
-                prompt_payload=prompt_payload,
+                prompt_payload=compact_payload,
                 temperature=0.0,
                 max_output_tokens=max_output_tokens,
             )
@@ -683,15 +757,38 @@ def run_model_call_with_retry(
                 fallback_text, fallback_parsed = run_model_call(
                     client=client,
                     model_name=fallback_model_name,
-                    prompt_payload=prompt_payload,
+                    prompt_payload=compact_payload,
                     temperature=0.0,
                     max_output_tokens=max_output_tokens,
                 )
                 last_raw_text = fallback_text
                 if fallback_parsed:
                     return fallback_text, fallback_parsed, fallback_model_name
-                compact_payload = build_compact_prompt_payload(prompt_payload)
-                if compact_payload is not prompt_payload:
+                fallback_compact_text, fallback_compact_parsed = run_model_call(
+                    client=client,
+                    model_name=fallback_model_name,
+                    prompt_payload=compact_payload,
+                    temperature=0.0,
+                    max_output_tokens=max_output_tokens,
+                    strict_schema=False,
+                )
+                last_raw_text = fallback_compact_text
+                if fallback_compact_parsed:
+                    return fallback_compact_text, fallback_compact_parsed, fallback_model_name
+            raise ModelOutputError("Vertex response could not be parsed into the analyst schema.", raw_text=last_raw_text)
+        except Exception as exc:
+            if isinstance(exc, ModelOutputError) and fallback_model_name and fallback_model_name != model_name:
+                try:
+                    fallback_text, fallback_parsed = run_model_call(
+                        client=client,
+                        model_name=fallback_model_name,
+                        prompt_payload=compact_payload,
+                        temperature=0.0,
+                        max_output_tokens=max_output_tokens,
+                    )
+                    last_raw_text = fallback_text
+                    if fallback_parsed:
+                        return fallback_text, fallback_parsed, fallback_model_name
                     fallback_compact_text, fallback_compact_parsed = run_model_call(
                         client=client,
                         model_name=fallback_model_name,
@@ -703,33 +800,6 @@ def run_model_call_with_retry(
                     last_raw_text = fallback_compact_text
                     if fallback_compact_parsed:
                         return fallback_compact_text, fallback_compact_parsed, fallback_model_name
-            raise ModelOutputError("Vertex response could not be parsed into the analyst schema.", raw_text=last_raw_text)
-        except Exception as exc:
-            if isinstance(exc, ModelOutputError) and fallback_model_name and fallback_model_name != model_name:
-                try:
-                    fallback_text, fallback_parsed = run_model_call(
-                        client=client,
-                        model_name=fallback_model_name,
-                        prompt_payload=prompt_payload,
-                        temperature=0.0,
-                        max_output_tokens=max_output_tokens,
-                    )
-                    last_raw_text = fallback_text
-                    if fallback_parsed:
-                        return fallback_text, fallback_parsed, fallback_model_name
-                    compact_payload = build_compact_prompt_payload(prompt_payload)
-                    if compact_payload is not prompt_payload:
-                        fallback_compact_text, fallback_compact_parsed = run_model_call(
-                            client=client,
-                            model_name=fallback_model_name,
-                            prompt_payload=compact_payload,
-                            temperature=0.0,
-                            max_output_tokens=max_output_tokens,
-                            strict_schema=False,
-                        )
-                        last_raw_text = fallback_compact_text
-                        if fallback_compact_parsed:
-                            return fallback_compact_text, fallback_compact_parsed, fallback_model_name
                 except Exception as fallback_exc:
                     if isinstance(fallback_exc, ModelOutputError):
                         last_raw_text = fallback_exc.raw_text or last_raw_text
@@ -776,9 +846,16 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     results: List[Dict[str, Any]] = []
+    audit_records: List[Dict[str, Any]] = []
+    prompt_versions_seen: set[str] = set()
+    payload_policy_versions_seen: set[str] = set()
     for index, path in enumerate(prompt_files, start=1):
         prompt_payload = json.loads(path.read_text(encoding="utf-8"))
+        prompt_versions_seen.add(str(prompt_payload.get("prompt_version", "")))
+        payload_policy_versions_seen.add(str(prompt_payload.get("payload_policy_version", "")))
         queue_id = str(prompt_payload["queue_id"])
+        prompt_contract_errors = validate_prompt_payload_contract(prompt_payload)
+        runtime_prompt_payload = build_compact_prompt_payload(prompt_payload)
         stem = safe_stem(queue_id)
         parsed: Dict[str, Any] = {}
         raw_text = ""
@@ -786,30 +863,43 @@ def main() -> None:
         runtime_error = ""
         model_used = args.model
 
-        try:
-            raw_text, parsed, model_used = run_model_call_with_retry(
-                client=client,
-                model_name=args.model,
-                fallback_model_name=args.fallback_model,
-                prompt_payload=prompt_payload,
-                temperature=args.temperature,
-                max_output_tokens=args.max_output_tokens,
-            )
-            validation_errors = validate_model_output(parsed)
-        except Exception as exc:
-            if isinstance(exc, ModelOutputError):
-                raw_text = exc.raw_text
+        if prompt_contract_errors:
+            runtime_error = "PromptContractError: " + "; ".join(prompt_contract_errors)
             if not args.disable_deterministic_fallback:
-                parsed = build_deterministic_output(prompt_payload)
+                parsed = build_deterministic_output(runtime_prompt_payload)
                 validation_errors = validate_model_output(parsed)
                 if not validation_errors:
-                    model_used = f"{args.model}+deterministic_fallback"
-                    runtime_error = ""
-                    raw_text = raw_text or json.dumps(parsed, ensure_ascii=False)
+                    model_used = "deterministic_fallback_prompt_contract"
+                    raw_text = json.dumps(parsed, ensure_ascii=False)
+                else:
+                    runtime_error = runtime_error + "; deterministic fallback invalid"
+            else:
+                validation_errors = ["prompt contract invalid"]
+        else:
+            try:
+                raw_text, parsed, model_used = run_model_call_with_retry(
+                    client=client,
+                    model_name=args.model,
+                    fallback_model_name=args.fallback_model,
+                    prompt_payload=runtime_prompt_payload,
+                    temperature=args.temperature,
+                    max_output_tokens=args.max_output_tokens,
+                )
+                validation_errors = validate_model_output(parsed)
+            except Exception as exc:
+                if isinstance(exc, ModelOutputError):
+                    raw_text = exc.raw_text
+                if not args.disable_deterministic_fallback:
+                    parsed = build_deterministic_output(runtime_prompt_payload)
+                    validation_errors = validate_model_output(parsed)
+                    if not validation_errors:
+                        model_used = f"{args.model}+deterministic_fallback"
+                        runtime_error = ""
+                        raw_text = raw_text or json.dumps(parsed, ensure_ascii=False)
+                    else:
+                        runtime_error = f"{exc.__class__.__name__}: {exc}"
                 else:
                     runtime_error = f"{exc.__class__.__name__}: {exc}"
-            else:
-                runtime_error = f"{exc.__class__.__name__}: {exc}"
 
         (out_dir / f"{stem}.raw.txt").write_text(raw_text, encoding="utf-8")
         if parsed:
@@ -819,12 +909,31 @@ def main() -> None:
             "queue_id": queue_id,
             "dataset_id": prompt_payload["dataset_id"],
             "model": model_used,
+            "prompt_version": str(prompt_payload.get("prompt_version", "")),
+            "payload_policy_version": str(prompt_payload.get("payload_policy_version", "")),
             "output_file": f"{stem}.json" if parsed else "",
             "raw_file": f"{stem}.raw.txt",
             "runtime_error": runtime_error,
             **summarize_response(raw_text, parsed, validation_errors),
         }
         results.append(item)
+        audit_records.append(
+            {
+                "created_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "queue_id": queue_id,
+                "dataset_id": prompt_payload["dataset_id"],
+                "model": model_used,
+                "prompt_version": str(prompt_payload.get("prompt_version", "")),
+                "payload_policy_version": str(prompt_payload.get("payload_policy_version", "")),
+                "masking_applied": bool(prompt_payload.get("masking_applied", False)),
+                "request_chars": second_message_char_count(runtime_prompt_payload),
+                "response_chars": int(item.get("response_chars", 0)),
+                "runtime_error": runtime_error,
+                "validation_error_count": len(item.get("validation_errors", [])),
+                "output_file": item.get("output_file", ""),
+                "raw_file": item.get("raw_file", ""),
+            }
+        )
         if float(args.request_delay_seconds) > 0 and index < len(prompt_files):
             time.sleep(float(args.request_delay_seconds))
 
@@ -847,6 +956,9 @@ def main() -> None:
         "request_delay_seconds": float(args.request_delay_seconds),
         "response_count": len(results),
         "error_count": error_count,
+        "prompt_versions": sorted(version for version in prompt_versions_seen if version),
+        "payload_policy_versions": sorted(version for version in payload_policy_versions_seen if version),
+        "audit_log_file": "audit-log.jsonl",
         "results": results,
     }
 
@@ -855,6 +967,8 @@ def main() -> None:
         promoted_to_latest = False
     summary["promoted_to_latest"] = promoted_to_latest
     (out_dir / "run-summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
+    audit_lines = [json.dumps(record, ensure_ascii=False) for record in audit_records]
+    (out_dir / "audit-log.jsonl").write_text("\n".join(audit_lines) + ("\n" if audit_lines else ""), encoding="utf-8")
 
     last_dir = output_root / "last"
     last_dir.mkdir(parents=True, exist_ok=True)

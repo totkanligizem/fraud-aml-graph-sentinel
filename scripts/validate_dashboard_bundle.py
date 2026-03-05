@@ -33,6 +33,7 @@ REQUIRED_TOP_LEVEL_KEYS = {
     "score_buckets",
     "queue_highlights",
     "graph_panels",
+    "drift",
     "analyst",
     "pipeline_steps",
     "top_features",
@@ -155,6 +156,28 @@ def validate_payload(payload: Dict[str, Any], errors: List[str], warnings: List[
             ensure(row.get("value") is None, f"unresolved quality row should have null value for {row.get('name')}", errors)
         else:
             ensure(isinstance(row.get("value"), int), f"resolved quality row must have integer value for {row.get('name')}", errors)
+
+    drift = payload.get("drift", {})
+    ensure(isinstance(drift, dict), "drift payload is invalid", errors)
+    if isinstance(drift, dict):
+        ensure("available" in drift, "drift.available missing", errors)
+        if drift.get("available"):
+            psi = drift.get("score_psi")
+            ks = drift.get("score_ks")
+            jaccard = drift.get("queue_jaccard_top20")
+            ensure(isinstance(psi, (int, float)) and psi >= 0.0, "drift.score_psi must be >= 0", errors)
+            ensure(isinstance(ks, (int, float)) and 0.0 <= ks <= 1.0, "drift.score_ks must be in [0,1]", errors)
+            if jaccard is not None:
+                ensure(
+                    isinstance(jaccard, (int, float)) and 0.0 <= jaccard <= 1.0,
+                    "drift.queue_jaccard_top20 must be in [0,1] when present",
+                    errors,
+                )
+            ensure(
+                str(drift.get("status", "")) in {"stable", "watch", "alert"},
+                "drift.status must be one of stable/watch/alert when drift is available",
+                errors,
+            )
 
     evidence_paths = payload.get("evidence_paths", [])
     evidence_items = payload.get("evidence_items", [])

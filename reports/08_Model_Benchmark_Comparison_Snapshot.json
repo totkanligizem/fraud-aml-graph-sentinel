@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-03-05T15:32:52Z",
+  "generated_at_utc": "2026-03-05T16:43:59Z",
   "baseline": {
     "metrics_path": "artifacts/models/fraud_baseline/latest/metrics.json",
     "ranking_path": "artifacts/models/ranking/latest/ranking-summary.json",
@@ -31,6 +31,47 @@
     "roc_auc_calibrated": 0.9045916682382047,
     "mean_precision_at_50": 0.27068181818181825,
     "mean_ndcg_at_50": 0.2983129415132108
+  },
+  "subtask_evaluation": {
+    "baseline": {
+      "available": true,
+      "reason": "",
+      "by_label_type": {
+        "fraud": {
+          "rows": 884807,
+          "positive_rows": 10772,
+          "positive_rate": 0.012174406395971098,
+          "average_precision": 0.05734098536383258,
+          "pr_auc_trapz": 0.05730945032894134
+        }
+      }
+    },
+    "benchmark": {
+      "available": true,
+      "reason": "",
+      "by_label_type": {
+        "fraud": {
+          "rows": 884807,
+          "positive_rows": 10772,
+          "positive_rate": 0.012174406395971098,
+          "average_precision": 0.06472778557131624,
+          "pr_auc_trapz": 0.06459306112235286
+        }
+      }
+    },
+    "tree_benchmark": {
+      "available": true,
+      "reason": "",
+      "by_label_type": {
+        "fraud": {
+          "rows": 884807,
+          "positive_rows": 10772,
+          "positive_rate": 0.012174406395971098,
+          "average_precision": 0.15614986659640917,
+          "pr_auc_trapz": 0.1559717505548058
+        }
+      }
+    }
   },
   "deltas": {
     "ap_delta_calibrated_vs_baseline": 0.0015178704334937315,

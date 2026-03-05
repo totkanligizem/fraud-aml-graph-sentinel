@@ -1,0 +1,24 @@
+{
+  "version": "2026-03-v1",
+  "description": "Golden-case expectations for analyst copilot prompt governance and response consistency.",
+  "cases": [
+    {
+      "queue_id": "creditcard_fraud|2013-09-01",
+      "expected": {
+        "overall_priority": "high",
+        "fraud_risk": "high",
+        "aml_risk": "low",
+        "network_risk": "low"
+      }
+    },
+    {
+      "queue_id": "paysim|2017-01-01",
+      "expected": {
+        "overall_priority": "medium",
+        "fraud_risk": "medium",
+        "aml_risk": "low",
+        "network_risk": "low"
+      }
+    }
+  ]
+}

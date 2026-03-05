@@ -259,6 +259,11 @@ def build_staging_and_marts(conn: sqlite3.Connection, feature_base_limit: int, f
           geo,
           CAST(label_fraud AS INTEGER) AS label_fraud,
           CAST(label_aml AS INTEGER) AS label_aml,
+          CASE
+            WHEN CAST(label_fraud AS INTEGER) IN (0, 1) THEN 'fraud'
+            WHEN CAST(label_aml AS INTEGER) IN (0, 1) THEN 'aml'
+            ELSE 'unknown'
+          END AS label_type,
           label_source,
           pii_class,
           consent_class,
@@ -302,6 +307,7 @@ def build_staging_and_marts(conn: sqlite3.Connection, feature_base_limit: int, f
         SELECT
           b.event_id,
           b.event_time,
+          datetime(b.event_time, '-1 second') AS feature_asof_ts,
           b.payer_party_id,
           (
             SELECT COUNT(*)
@@ -334,6 +340,7 @@ def build_staging_and_marts(conn: sqlite3.Connection, feature_base_limit: int, f
         SELECT
           b.event_id,
           b.event_time,
+          datetime(b.event_time, '-1 second') AS feature_asof_ts,
           b.dataset_id,
           b.payer_party_id,
           b.payee_party_id,
