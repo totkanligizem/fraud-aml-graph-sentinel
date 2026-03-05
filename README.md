@@ -1,5 +1,7 @@
 # Fraud - AML Graph Sentinel
 
+Turkish version (TR): [README.tr.md](README.tr.md)
+
 An end-to-end fraud and anti-money-laundering (AML) intelligence project that unifies:
 
 - multi-source transaction ingestion,
@@ -11,7 +13,7 @@ An end-to-end fraud and anti-money-laundering (AML) intelligence project that un
 - Vertex AI Gemini analyst copilot,
 - and a publish-ready executive dashboard.
 
-As of **2026-03-04 UTC**, all core quality gates passed and the project is in a **READY FOR PUBLISH** state.
+As of **2026-03-05 UTC**, all core quality gates passed and the project is in a **READY FOR PUBLISH** state.
 
 ## Table of Contents
 
@@ -145,13 +147,18 @@ Creates:
 - `stg_transaction_event`
 - `transaction_mart`
 - `feature_payer_24h` (point-in-time safe 24h payer activity features)
+- `feature_graph_24h` (point-in-time safe party/edge interaction features)
 - `monitoring_mart` (daily monitoring aggregates)
 
 Design choices:
 
 - deterministic table rebuild,
 - index creation for query efficiency,
-- optional row caps for smoke/core/full modes.
+- optional row caps for smoke/core/full modes,
+- feature base selection modes for `feature_payer_24h`:
+  - `capped` (global cap),
+  - `per_dataset` (balanced cap per dataset),
+  - `full` (all eligible rows).
 
 ### 6.3 Fraud Baseline Training and Scoring
 
@@ -165,12 +172,17 @@ Modeling approach:
 - Logistic regression implemented in NumPy
 - Mini-batch gradient descent
 - Weighted BCE + L2 regularization
-- Time-based split (not random split)
+- Time-based split modes:
+  - `global_time`
+  - `per_dataset_time` (recommended for multi-source fairness)
 - Manual threshold optimization with asymmetric business costs
 
 Feature engineering:
 
-- Numeric: `log_amount`, `payer_txn_count_24h`, `log_payer_amt_sum_24h`, `hour_of_day`, `day_of_week`
+- Numeric: `log_amount`, `payer_txn_count_24h`, `log_payer_amt_sum_24h`,
+  `graph_payer_incoming_txn_count_24h`, `graph_payer_unique_payees_24h`,
+  `graph_pair_txn_count_30d`, `log_graph_pair_amt_sum_30d`, `graph_reciprocal_pair_txn_count_30d`,
+  `hour_of_day`, `day_of_week`
 - Categorical one-hot: `dataset_id`, `channel`, `txn_type`, `currency`
 
 ### 6.4 Queue Ranking Layer
@@ -264,6 +276,8 @@ Deliverables:
 | Model Layer | Model | Purpose |
 |---|---|---|
 | Fraud baseline | NumPy logistic regression | Score transaction-level fraud risk |
+| Fraud benchmark | NumPy logistic + interaction features + Platt calibration | Compare lift and probability calibration vs baseline |
+| Fraud tree benchmark (optional) | `HistGradientBoostingClassifier` + Platt calibration | Non-linear benchmark with queue-level comparison |
 | Analyst copilot default | `gemini-2.5-flash` on Vertex AI | Fast structured analyst summaries |
 | Analyst copilot escalation | `gemini-2.5-pro` on Vertex AI | Ambiguous/high-impact case escalation |
 
@@ -337,6 +351,12 @@ Install core Python dependencies:
 ```bash
 python3 -m pip install --upgrade pip
 python3 -m pip install numpy pandas matplotlib google-cloud-bigquery google-auth google-genai
+```
+
+Optional benchmark dependency:
+
+```bash
+python3 -m pip install scikit-learn
 ```
 
 Environment variables expected by cloud scripts:
@@ -447,6 +467,39 @@ make report-master
 make report-master-en
 ```
 
+### 11.6 Benchmark model and comparison
+
+```bash
+make model-benchmark-pipeline
+```
+
+Outputs:
+
+- benchmark model artifacts: `artifacts/models/fraud_benchmark_numpy/latest/`
+- benchmark scores table: `fraud_scores_benchmark`
+- benchmark ranking summary: `artifacts/models/ranking_benchmark/latest/ranking-summary.json`
+- model comparison report: `reports/08_Model_Benchmark_Comparison_EN.md`
+
+Optional tree benchmark:
+
+```bash
+make tree-benchmark-pipeline
+```
+
+### 11.7 Reproducible Sample Smoke Pipeline
+
+```bash
+make sample-e2e
+```
+
+What it does:
+
+- generates deterministic synthetic canonical datasets under `data/sample/transaction_event`
+- builds sample SQLite warehouse (`data/sample/warehouse/ledger_sentinel_sample.db`)
+- trains/scores baseline model on sample DB
+- builds queue and graph layers
+- runs pipeline and graph validation gates on sample DB
+
 ## 12. Validation, Testing, and Quality Gates
 
 Validation is explicit and script-driven, not implicit.
@@ -459,6 +512,7 @@ Validation is explicit and script-driven, not implicit.
   - fraud score distribution checks
   - queue distinctness checks
   - critical data quality null/domain/collision checks
+  - feature coverage thresholds for `feature_payer_24h` and `feature_graph_24h`
 
 ### Graph gates
 
@@ -494,9 +548,14 @@ Validation is explicit and script-driven, not implicit.
   - runtime and schema error checks
   - mandatory structured fields and file-level evidence checks
 
+### CI smoke checks
+
+- GitHub Actions workflow: `.github/workflows/smoke-sample.yml`
+- Executes `make sample-e2e` on push and pull requests for reproducibility regression control.
+
 ## 13. Current Results Snapshot
 
-Source: `reports/07_Master_Final_Report_EN.md` and latest snapshots.
+Source: latest checkpoint + model-comparison snapshots.
 
 ### Pipeline scale
 
@@ -508,11 +567,12 @@ Source: `reports/07_Master_Final_Report_EN.md` and latest snapshots.
 
 ### Model and ranking
 
-- Average Precision: **0.0424**
-- PR-AUC: **0.0424**
-- Cost-optimized threshold: **0.624862**
-- Mean Precision@50: **7.45%**
-- Mean NDCG@50: **7.11%**
+- Baseline AP / PR-AUC: **0.0710 / 0.0708**
+- Baseline Mean Precision@50 / NDCG@50: **6.91% / 6.96%**
+- Benchmark AP / PR-AUC: **0.0725 / 0.0725**
+- Benchmark Mean Precision@50 / NDCG@50: **8.73% / 8.20%**
+- Tree benchmark AP / PR-AUC: **0.1385 / 0.1378**
+- Tree benchmark Mean Precision@50 / NDCG@50: **27.07% / 29.83%**
 
 ### Quality state
 
@@ -556,13 +616,14 @@ Open:
 
 - Built a complete fraud+AML data-to-decision pipeline.
 - Added graph intelligence and queue-level prioritization.
+- Integrated leakage-safe graph interaction features into fraud model training/scoring.
 - Added Gemini-based analyst copilot with validation and BigQuery integration.
 - Added strong quality gates and publish criteria.
 - Produced professional dashboard and full TR/EN reporting outputs.
 
 ### High-impact next extensions
 
-1. Add supervised graph-based features to fraud model (e.g., edge-risk statistics as model inputs).
+1. Add richer supervised graph-based features (e.g., centrality/community embeddings) on top of current leakage-safe graph interactions.
 2. Introduce model calibration and drift monitoring across datasets.
 3. Add CI pipeline (lint + smoke + validator suite) for every commit.
 4. Add scenario simulation and what-if queue stress testing.

@@ -7,6 +7,7 @@ Outputs tables:
 - stg_transaction_event
 - transaction_mart
 - feature_payer_24h (point-in-time safe, limited base rows)
+- feature_graph_24h (point-in-time safe party/edge graph features)
 - monitoring_mart
 """
 
@@ -59,7 +60,18 @@ def parse_args() -> argparse.Namespace:
         "--feature-base-limit",
         type=int,
         default=200000,
-        help="Max base rows for feature_payer_24h table to control runtime",
+        help="Base row limit for feature_payer_24h when mode is capped/per_dataset",
+    )
+    parser.add_argument(
+        "--feature-base-mode",
+        choices=["capped", "full", "per_dataset"],
+        default="capped",
+        help=(
+            "Feature base selection mode: "
+            "'capped' uses global earliest rows, "
+            "'full' uses all eligible rows, "
+            "'per_dataset' applies per-dataset row cap"
+        ),
     )
     parser.add_argument(
         "--recreate",
@@ -118,6 +130,7 @@ def drop_tables(conn: sqlite3.Connection) -> None:
     cur.executescript(
         """
         DROP TABLE IF EXISTS monitoring_mart;
+        DROP TABLE IF EXISTS feature_graph_24h;
         DROP TABLE IF EXISTS feature_payer_24h;
         DROP TABLE IF EXISTS transaction_mart;
         DROP TABLE IF EXISTS stg_transaction_event;
@@ -161,7 +174,62 @@ def load_raw_table(
     return loaded
 
 
-def build_staging_and_marts(conn: sqlite3.Connection, feature_base_limit: int) -> None:
+def feature_base_select_sql(feature_base_mode: str, feature_base_limit: int) -> str:
+    if feature_base_mode == "full":
+        return """
+          SELECT
+            event_id,
+            event_time,
+            dataset_id,
+            payer_party_id,
+            payee_party_id
+          FROM transaction_mart
+          WHERE payer_party_id IS NOT NULL
+            AND TRIM(payer_party_id) <> ''
+          ORDER BY event_time
+        """
+    if feature_base_mode == "per_dataset":
+        return f"""
+          SELECT
+            event_id,
+            event_time,
+            dataset_id,
+            payer_party_id,
+            payee_party_id
+          FROM (
+            SELECT
+              event_id,
+              event_time,
+              dataset_id,
+              payer_party_id,
+              payee_party_id,
+              ROW_NUMBER() OVER (
+                PARTITION BY dataset_id
+                ORDER BY event_time
+              ) AS rn
+            FROM transaction_mart
+            WHERE payer_party_id IS NOT NULL
+              AND TRIM(payer_party_id) <> ''
+          ) ranked
+          WHERE rn <= {int(feature_base_limit)}
+          ORDER BY event_time
+        """
+    return f"""
+      SELECT
+        event_id,
+        event_time,
+        dataset_id,
+        payer_party_id,
+        payee_party_id
+      FROM transaction_mart
+      WHERE payer_party_id IS NOT NULL
+        AND TRIM(payer_party_id) <> ''
+      ORDER BY event_time
+      LIMIT {int(feature_base_limit)}
+    """
+
+
+def build_staging_and_marts(conn: sqlite3.Connection, feature_base_limit: int, feature_base_mode: str) -> None:
     cur = conn.cursor()
 
     cur.executescript(
@@ -215,25 +283,21 @@ def build_staging_and_marts(conn: sqlite3.Connection, feature_base_limit: int) -
 
         CREATE INDEX IF NOT EXISTS idx_tm_event_time ON transaction_mart(event_time);
         CREATE INDEX IF NOT EXISTS idx_tm_payer_event_time ON transaction_mart(payer_party_id, event_time);
+        CREATE INDEX IF NOT EXISTS idx_tm_payee_event_time ON transaction_mart(payee_party_id, event_time);
+        CREATE INDEX IF NOT EXISTS idx_tm_pair_event_time ON transaction_mart(payer_party_id, payee_party_id, event_time);
         CREATE INDEX IF NOT EXISTS idx_tm_dataset ON transaction_mart(dataset_id);
         CREATE INDEX IF NOT EXISTS idx_tm_dataset_event_time ON transaction_mart(dataset_id, event_time);
         CREATE INDEX IF NOT EXISTS idx_tm_event_id ON transaction_mart(event_id);
         """
     )
 
+    base_select_sql = feature_base_select_sql(feature_base_mode=feature_base_mode, feature_base_limit=feature_base_limit)
     cur.executescript(
         f"""
         DROP TABLE IF EXISTS feature_payer_24h;
         CREATE TABLE feature_payer_24h AS
         WITH base AS (
-          SELECT
-            event_id,
-            event_time,
-            payer_party_id
-          FROM transaction_mart
-          WHERE payer_party_id IS NOT NULL
-          ORDER BY event_time
-          LIMIT {int(feature_base_limit)}
+          {base_select_sql}
         )
         SELECT
           b.event_id,
@@ -261,6 +325,67 @@ def build_staging_and_marts(conn: sqlite3.Connection, feature_base_limit: int) -
     )
 
     cur.executescript(
+        f"""
+        DROP TABLE IF EXISTS feature_graph_24h;
+        CREATE TABLE feature_graph_24h AS
+        WITH base AS (
+          {base_select_sql}
+        )
+        SELECT
+          b.event_id,
+          b.event_time,
+          b.dataset_id,
+          b.payer_party_id,
+          b.payee_party_id,
+          (
+            SELECT COUNT(*)
+            FROM transaction_mart h
+            WHERE h.payee_party_id = b.payer_party_id
+              AND h.event_time < b.event_time
+              AND h.event_time >= datetime(b.event_time, '-24 hours')
+          ) AS graph_payer_incoming_txn_count_24h,
+          (
+            SELECT COUNT(DISTINCT h.payee_party_id)
+            FROM transaction_mart h
+            WHERE h.payer_party_id = b.payer_party_id
+              AND h.payee_party_id IS NOT NULL
+              AND TRIM(h.payee_party_id) <> ''
+              AND h.event_time < b.event_time
+              AND h.event_time >= datetime(b.event_time, '-24 hours')
+          ) AS graph_payer_unique_payees_24h,
+          (
+            SELECT COUNT(*)
+            FROM transaction_mart h
+            WHERE h.payer_party_id = b.payer_party_id
+              AND h.payee_party_id = b.payee_party_id
+              AND h.event_time < b.event_time
+              AND h.event_time >= datetime(b.event_time, '-30 days')
+          ) AS graph_pair_txn_count_30d,
+          COALESCE((
+            SELECT SUM(h.amount)
+            FROM transaction_mart h
+            WHERE h.payer_party_id = b.payer_party_id
+              AND h.payee_party_id = b.payee_party_id
+              AND h.event_time < b.event_time
+              AND h.event_time >= datetime(b.event_time, '-30 days')
+          ), 0.0) AS graph_pair_amt_sum_30d,
+          (
+            SELECT COUNT(*)
+            FROM transaction_mart h
+            WHERE h.payer_party_id = b.payee_party_id
+              AND h.payee_party_id = b.payer_party_id
+              AND h.event_time < b.event_time
+              AND h.event_time >= datetime(b.event_time, '-30 days')
+          ) AS graph_reciprocal_pair_txn_count_30d
+        FROM base b;
+
+        CREATE INDEX IF NOT EXISTS idx_fg24_event_id ON feature_graph_24h(event_id);
+        CREATE INDEX IF NOT EXISTS idx_fg24_payer_event_time ON feature_graph_24h(payer_party_id, event_time);
+        CREATE INDEX IF NOT EXISTS idx_fg24_pair_event_time ON feature_graph_24h(payer_party_id, payee_party_id, event_time);
+        """
+    )
+
+    cur.executescript(
         """
         DROP TABLE IF EXISTS monitoring_mart;
         CREATE TABLE monitoring_mart AS
@@ -283,6 +408,84 @@ def table_count(conn: sqlite3.Connection, table: str) -> int:
     cur = conn.cursor()
     cur.execute(f"SELECT COUNT(*) FROM {table}")
     return int(cur.fetchone()[0])
+
+
+def feature_coverage_summary(conn: sqlite3.Connection) -> Dict[str, object]:
+    query = """
+    SELECT
+      tm.dataset_id AS dataset_id,
+      COUNT(*) AS transaction_rows,
+      SUM(
+        CASE
+          WHEN tm.payer_party_id IS NOT NULL AND TRIM(tm.payer_party_id) <> ''
+          THEN 1 ELSE 0
+        END
+      ) AS payer_rows,
+      SUM(CASE WHEN f.event_id IS NOT NULL THEN 1 ELSE 0 END) AS feature_rows_payer_24h,
+      SUM(CASE WHEN g.event_id IS NOT NULL THEN 1 ELSE 0 END) AS feature_rows_graph_24h
+    FROM transaction_mart tm
+    LEFT JOIN feature_payer_24h f
+      ON f.event_id = tm.event_id
+    LEFT JOIN feature_graph_24h g
+      ON g.event_id = tm.event_id
+    GROUP BY tm.dataset_id
+    ORDER BY tm.dataset_id
+    """
+    rows = pd.read_sql_query(query, conn)
+
+    by_dataset: Dict[str, Dict[str, object]] = {}
+    total_transactions = 0
+    total_payer = 0
+    total_features_payer = 0
+    total_features_graph = 0
+    for _, row in rows.iterrows():
+        dataset_id = str(row["dataset_id"])
+        transaction_rows = int(row["transaction_rows"])
+        payer_rows = int(row["payer_rows"])
+        feature_rows_payer = int(row["feature_rows_payer_24h"])
+        feature_rows_graph = int(row["feature_rows_graph_24h"])
+        coverage_total_payer = (feature_rows_payer / transaction_rows) if transaction_rows > 0 else 0.0
+        coverage_total_graph = (feature_rows_graph / transaction_rows) if transaction_rows > 0 else 0.0
+        coverage_over_payer_payer = (feature_rows_payer / payer_rows) if payer_rows > 0 else None
+        coverage_over_payer_graph = (feature_rows_graph / payer_rows) if payer_rows > 0 else None
+        by_dataset[dataset_id] = {
+            "transaction_rows": transaction_rows,
+            "payer_rows": payer_rows,
+            "feature_rows_payer_24h": feature_rows_payer,
+            "feature_rows_graph_24h": feature_rows_graph,
+            "coverage_total_payer_24h": round(float(coverage_total_payer), 6),
+            "coverage_total_graph_24h": round(float(coverage_total_graph), 6),
+            "coverage_over_payer_rows_payer_24h": None
+            if coverage_over_payer_payer is None
+            else round(float(coverage_over_payer_payer), 6),
+            "coverage_over_payer_rows_graph_24h": None
+            if coverage_over_payer_graph is None
+            else round(float(coverage_over_payer_graph), 6),
+        }
+        total_transactions += transaction_rows
+        total_payer += payer_rows
+        total_features_payer += feature_rows_payer
+        total_features_graph += feature_rows_graph
+
+    return {
+        "total_transaction_rows": total_transactions,
+        "total_payer_rows": total_payer,
+        "total_feature_rows_payer_24h": total_features_payer,
+        "total_feature_rows_graph_24h": total_features_graph,
+        "coverage_total_payer_24h": round(float(total_features_payer / total_transactions), 6)
+        if total_transactions > 0
+        else 0.0,
+        "coverage_total_graph_24h": round(float(total_features_graph / total_transactions), 6)
+        if total_transactions > 0
+        else 0.0,
+        "coverage_over_payer_rows_payer_24h": round(float(total_features_payer / total_payer), 6)
+        if total_payer > 0
+        else 0.0,
+        "coverage_over_payer_rows_graph_24h": round(float(total_features_graph / total_payer), 6)
+        if total_payer > 0
+        else 0.0,
+        "by_dataset": by_dataset,
+    }
 
 
 def main() -> None:
@@ -319,20 +522,29 @@ def main() -> None:
         print(f"[DONE] dataset={dataset_id} loaded_rows={loaded}")
 
     print("[INFO] building staging/marts/features")
-    build_staging_and_marts(conn, feature_base_limit=args.feature_base_limit)
+    build_staging_and_marts(
+        conn,
+        feature_base_limit=args.feature_base_limit,
+        feature_base_mode=args.feature_base_mode,
+    )
+    coverage_summary = feature_coverage_summary(conn)
 
     summary = {
         "created_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "db_path": str(db_path),
         "datasets": loaded_map,
         "runs": run_map,
+        "feature_base_mode": args.feature_base_mode,
+        "feature_base_limit": int(args.feature_base_limit),
         "table_counts": {
             "transaction_event_raw": table_count(conn, "transaction_event_raw"),
             "stg_transaction_event": table_count(conn, "stg_transaction_event"),
             "transaction_mart": table_count(conn, "transaction_mart"),
             "feature_payer_24h": table_count(conn, "feature_payer_24h"),
+            "feature_graph_24h": table_count(conn, "feature_graph_24h"),
             "monitoring_mart": table_count(conn, "monitoring_mart"),
         },
+        "feature_coverage": coverage_summary,
     }
 
     summary_path = db_path.parent / "warehouse-build-summary.json"

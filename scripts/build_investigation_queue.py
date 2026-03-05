@@ -8,8 +8,10 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
+import re
 from typing import Dict, List
 
 import numpy as np
@@ -19,6 +21,21 @@ import pandas as pd
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build ranked investigation queue from fraud_scores.")
     parser.add_argument("--db-path", default="data/warehouse/ledger_sentinel.db", help="SQLite DB path")
+    parser.add_argument(
+        "--scores-table",
+        default="fraud_scores",
+        help="Source scores table name",
+    )
+    parser.add_argument(
+        "--queue-table",
+        default="alert_queue",
+        help="Destination queue table name",
+    )
+    parser.add_argument(
+        "--score-column",
+        default="fraud_score",
+        help="Score column to use from scores table",
+    )
     parser.add_argument("--top-k", type=int, default=50, help="Top-K cutoff for ranking metrics")
     parser.add_argument(
         "--output-root",
@@ -46,27 +63,39 @@ def ndcg_at_k(relevance: np.ndarray, k: int) -> float:
     return float(dcg / idcg)
 
 
+def validate_sql_identifier(name: str, label: str) -> str:
+    value = str(name).strip()
+    if not value:
+        raise ValueError(f"{label} cannot be empty.")
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", value):
+        raise ValueError(f"Invalid {label}: {value}")
+    return value
+
+
 def main() -> None:
     args = parse_args()
     db_path = Path(args.db_path)
     if not db_path.exists():
         raise FileNotFoundError(f"Missing DB: {db_path}")
+    scores_table = validate_sql_identifier(args.scores_table, "scores table")
+    queue_table = validate_sql_identifier(args.queue_table, "queue table")
+    score_column = validate_sql_identifier(args.score_column, "score column")
 
     conn = sqlite3.connect(db_path)
     df = pd.read_sql_query(
-        """
+        f"""
         SELECT
           event_id,
           dataset_id,
           event_time,
-          fraud_score,
+          {score_column} AS fraud_score,
           COALESCE(label_fraud, 0) AS label_fraud
-        FROM fraud_scores
+        FROM {scores_table}
         """,
         conn,
     )
     if df.empty:
-        raise RuntimeError("fraud_scores table is empty. Run scoring first.")
+        raise RuntimeError(f"{scores_table} table is empty. Run scoring first.")
 
     df["event_time"] = pd.to_datetime(df["event_time"], errors="coerce")
     df = df.dropna(subset=["event_time"]).copy()
@@ -78,8 +107,8 @@ def main() -> None:
     df = df.sort_values(["queue_id", "fraud_score"], ascending=[True, False]).reset_index(drop=True)
     df["rank_in_queue"] = df.groupby("queue_id").cumcount() + 1
 
-    df.to_sql("alert_queue", conn, if_exists="replace", index=False, chunksize=1000)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_aq_queue_rank ON alert_queue(queue_id, rank_in_queue)")
+    df.to_sql(queue_table, conn, if_exists="replace", index=False, chunksize=1000)
+    conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{queue_table}_queue_rank ON {queue_table}(queue_id, rank_in_queue)")
     conn.commit()
 
     queue_metrics: List[Dict[str, float]] = []
@@ -107,6 +136,9 @@ def main() -> None:
     summary = {
         "created_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "db_path": str(db_path),
+        "scores_table": scores_table,
+        "queue_table": queue_table,
+        "score_column": score_column,
         "top_k": args.top_k,
         "queue_count": int(len(qm)),
         "mean_precision_at_k": float(qm[metric_p].mean()),
@@ -121,6 +153,26 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     qm.to_csv(out_dir / "queue_metrics.csv", index=False)
     (out_dir / "ranking-summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    latest = Path(args.output_root) / "latest"
+    symlink_ok = False
+    try:
+        if latest.is_symlink() or latest.exists():
+            if latest.is_dir() and not latest.is_symlink():
+                shutil.rmtree(latest)
+            else:
+                latest.unlink()
+        latest.symlink_to(out_dir.name, target_is_directory=True)
+        symlink_ok = True
+    except Exception:
+        symlink_ok = False
+
+    if not symlink_ok:
+        if latest.exists():
+            if latest.is_dir():
+                shutil.rmtree(latest)
+            else:
+                latest.unlink()
+        shutil.copytree(out_dir, latest)
     conn.close()
 
     print(json.dumps(summary, indent=2), flush=True)
@@ -129,4 +181,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

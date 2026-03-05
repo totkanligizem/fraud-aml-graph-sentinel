@@ -86,17 +86,34 @@ def build_matrix(
     frame["amount"] = pd.to_numeric(frame["amount"], errors="coerce").fillna(0.0)
     frame["payer_txn_count_24h"] = pd.to_numeric(frame["payer_txn_count_24h"], errors="coerce").fillna(0.0)
     frame["payer_amt_sum_24h"] = pd.to_numeric(frame["payer_amt_sum_24h"], errors="coerce").fillna(0.0)
+    frame["graph_payer_incoming_txn_count_24h"] = (
+        pd.to_numeric(frame["graph_payer_incoming_txn_count_24h"], errors="coerce").fillna(0.0)
+    )
+    frame["graph_payer_unique_payees_24h"] = (
+        pd.to_numeric(frame["graph_payer_unique_payees_24h"], errors="coerce").fillna(0.0)
+    )
+    frame["graph_pair_txn_count_30d"] = pd.to_numeric(frame["graph_pair_txn_count_30d"], errors="coerce").fillna(0.0)
+    frame["graph_pair_amt_sum_30d"] = pd.to_numeric(frame["graph_pair_amt_sum_30d"], errors="coerce").fillna(0.0)
+    frame["graph_reciprocal_pair_txn_count_30d"] = (
+        pd.to_numeric(frame["graph_reciprocal_pair_txn_count_30d"], errors="coerce").fillna(0.0)
+    )
     frame["event_time"] = pd.to_datetime(frame["event_time"], errors="coerce")
     frame["hour_of_day"] = frame["event_time"].dt.hour.fillna(0).astype(np.float64)
     frame["day_of_week"] = frame["event_time"].dt.dayofweek.fillna(0).astype(np.float64)
     frame["log_amount"] = np.log1p(frame["amount"].clip(lower=0))
     frame["log_payer_amt_sum_24h"] = np.log1p(frame["payer_amt_sum_24h"].clip(lower=0))
+    frame["log_graph_pair_amt_sum_30d"] = np.log1p(frame["graph_pair_amt_sum_30d"].clip(lower=0))
 
     num_base = pd.DataFrame(
         {
             "log_amount": frame["log_amount"],
             "payer_txn_count_24h": frame["payer_txn_count_24h"],
             "log_payer_amt_sum_24h": frame["log_payer_amt_sum_24h"],
+            "graph_payer_incoming_txn_count_24h": frame["graph_payer_incoming_txn_count_24h"],
+            "graph_payer_unique_payees_24h": frame["graph_payer_unique_payees_24h"],
+            "graph_pair_txn_count_30d": frame["graph_pair_txn_count_30d"],
+            "log_graph_pair_amt_sum_30d": frame["log_graph_pair_amt_sum_30d"],
+            "graph_reciprocal_pair_txn_count_30d": frame["graph_reciprocal_pair_txn_count_30d"],
             "hour_of_day": frame["hour_of_day"],
             "day_of_week": frame["day_of_week"],
         }
@@ -156,10 +173,17 @@ def main() -> None:
       tm.amount,
       tm.label_fraud,
       COALESCE(f.payer_txn_count_24h, 0.0) AS payer_txn_count_24h,
-      COALESCE(f.payer_amt_sum_24h, 0.0) AS payer_amt_sum_24h
+      COALESCE(f.payer_amt_sum_24h, 0.0) AS payer_amt_sum_24h,
+      COALESCE(g.graph_payer_incoming_txn_count_24h, 0.0) AS graph_payer_incoming_txn_count_24h,
+      COALESCE(g.graph_payer_unique_payees_24h, 0.0) AS graph_payer_unique_payees_24h,
+      COALESCE(g.graph_pair_txn_count_30d, 0.0) AS graph_pair_txn_count_30d,
+      COALESCE(g.graph_pair_amt_sum_30d, 0.0) AS graph_pair_amt_sum_30d,
+      COALESCE(g.graph_reciprocal_pair_txn_count_30d, 0.0) AS graph_reciprocal_pair_txn_count_30d
     FROM transaction_mart tm
     LEFT JOIN feature_payer_24h f
       ON f.event_id = tm.event_id
+    LEFT JOIN feature_graph_24h g
+      ON g.event_id = tm.event_id
     WHERE tm.dataset_id IN ({{placeholders}})
     ORDER BY tm.event_time
     {{max_clause}}
@@ -216,10 +240,17 @@ def main() -> None:
           tm.amount,
           tm.label_fraud,
           COALESCE(f.payer_txn_count_24h, 0.0) AS payer_txn_count_24h,
-          COALESCE(f.payer_amt_sum_24h, 0.0) AS payer_amt_sum_24h
+          COALESCE(f.payer_amt_sum_24h, 0.0) AS payer_amt_sum_24h,
+          COALESCE(g.graph_payer_incoming_txn_count_24h, 0.0) AS graph_payer_incoming_txn_count_24h,
+          COALESCE(g.graph_payer_unique_payees_24h, 0.0) AS graph_payer_unique_payees_24h,
+          COALESCE(g.graph_pair_txn_count_30d, 0.0) AS graph_pair_txn_count_30d,
+          COALESCE(g.graph_pair_amt_sum_30d, 0.0) AS graph_pair_amt_sum_30d,
+          COALESCE(g.graph_reciprocal_pair_txn_count_30d, 0.0) AS graph_reciprocal_pair_txn_count_30d
         FROM transaction_mart tm
         LEFT JOIN feature_payer_24h f
           ON f.event_id = tm.event_id
+        LEFT JOIN feature_graph_24h g
+          ON g.event_id = tm.event_id
         WHERE tm.dataset_id = ?
         ORDER BY tm.event_time
         LIMIT ?

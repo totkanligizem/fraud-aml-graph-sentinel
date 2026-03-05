@@ -351,7 +351,13 @@ function renderTrend() {
   const svg = $("trend-chart");
   const width = 920;
   const height = 360;
-  const padding = { top: 24, right: 26, bottom: 42, left: 18 };
+  const padding = { top: 24, right: 30, bottom: 42, left: 30 };
+  if (!Array.isArray(series) || series.length === 0) {
+    svg.innerHTML = "";
+    $("trend-note").textContent = "Current lens has no daily trend points.";
+    $("trend-summary").innerHTML = "";
+    return;
+  }
   const maxTxn = Math.max(...series.map((item) => item.txn_count), 1);
   const maxRate = Math.max(...series.map((item) => ((item.fraud_count || 0) / Math.max(item.txn_count, 1)) * 1000), 0.01);
   const maxAml = Math.max(...series.map((item) => item.aml_count || 0), 1);
@@ -367,12 +373,19 @@ function renderTrend() {
 
   const areaPath = buildAreaPath(series, (item) => item.txn_count, width, height, padding);
   const fraudLine = buildTrendPath(series, (_, index) => index, (item) => ((item.fraud_count || 0) / Math.max(item.txn_count, 1)) * 1000, width, height, padding);
-  const labels = series
-    .filter((_, index) => index === 0 || index === series.length - 1 || index === Math.floor(series.length / 2))
-    .map((item, index, arr) => {
-      const sourceIndex = [0, Math.floor(series.length / 2), series.length - 1][index] ?? 0;
-      const x = padding.left + (sourceIndex / Math.max(series.length - 1, 1)) * innerWidth;
-      return `<text x="${x}" y="${height - 12}" text-anchor="middle" fill="var(--muted)" font-size="12">${formatDateShort(item.event_date)}</text>`;
+  const labelIndexes = [...new Set([0, Math.floor(series.length / 2), series.length - 1])].sort((a, b) => a - b);
+  const labels = labelIndexes
+    .map((sourceIndex) => {
+      const item = series[sourceIndex];
+      const isFirst = sourceIndex === 0;
+      const isLast = sourceIndex === series.length - 1;
+      const x = isFirst
+        ? padding.left + 2
+        : isLast
+          ? width - padding.right - 2
+          : padding.left + (sourceIndex / Math.max(series.length - 1, 1)) * innerWidth;
+      const anchor = isFirst ? "start" : isLast ? "end" : "middle";
+      return `<text x="${x}" y="${height - 12}" text-anchor="${anchor}" fill="var(--muted)" font-size="12">${formatDateShort(item?.event_date)}</text>`;
     })
     .join("");
 
@@ -547,8 +560,11 @@ function renderBuckets() {
     })
     .join("");
 
-  const highlights = getQueueHighlights();
-  $("queue-highlights").innerHTML = highlights
+  const highlights = [...getQueueHighlights()].sort(
+    (left, right) => (right.avg_score - left.avg_score) || (right.positive_rows - left.positive_rows)
+  );
+  const visibleHighlights = highlights.slice(0, 4);
+  const highlightsHtml = visibleHighlights
     .map(
       (item) => `
         <article class="queue-item">
@@ -577,6 +593,15 @@ function renderBuckets() {
       `
     )
     .join("");
+  const overflowNote =
+    highlights.length > visibleHighlights.length
+      ? `
+        <div class="queue-foot queue-foot-caption">
+          <span>Showing top ${fmtInt.format(visibleHighlights.length)} of ${fmtInt.format(highlights.length)} queues in this lens.</span>
+        </div>
+      `
+      : "";
+  $("queue-highlights").innerHTML = `${highlightsHtml}${overflowNote}`;
 }
 
 function renderRanking() {

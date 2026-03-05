@@ -1,0 +1,45 @@
+{
+  "generated_at_utc": "2026-03-05T15:09:12Z",
+  "baseline": {
+    "metrics_path": "artifacts/models/fraud_baseline/latest/metrics.json",
+    "ranking_path": "artifacts/models/ranking/latest/ranking-summary.json",
+    "average_precision": 0.07102027662191153,
+    "pr_auc_trapz": 0.07082268115731531,
+    "roc_auc": null,
+    "mean_precision_at_50": 0.06909090909090909,
+    "mean_ndcg_at_50": 0.06964713758365965
+  },
+  "benchmark": {
+    "metrics_path": "artifacts/models/fraud_benchmark_numpy/latest/metrics.json",
+    "ranking_path": "artifacts/models/ranking_benchmark/latest/ranking-summary.json",
+    "average_precision_raw": 0.07253814705540526,
+    "average_precision_calibrated": 0.07253814705540526,
+    "pr_auc_trapz_raw": 0.0724535314881985,
+    "pr_auc_trapz_calibrated": 0.0724535314881985,
+    "roc_auc_raw": 0.8724489829121906,
+    "roc_auc_calibrated": 0.8724489829121906,
+    "mean_precision_at_50": 0.08727272727272728,
+    "mean_ndcg_at_50": 0.08198344448491832
+  },
+  "tree_benchmark": {
+    "available": true,
+    "metrics_path": "artifacts/models/fraud_tree_benchmark/latest/metrics.json",
+    "ranking_path": "artifacts/models/ranking_tree/latest/ranking-summary.json",
+    "skip_reason": "",
+    "average_precision_calibrated": 0.13850195466407952,
+    "pr_auc_trapz_calibrated": 0.1378250466374316,
+    "roc_auc_calibrated": 0.9045916682382047,
+    "mean_precision_at_50": 0.27068181818181825,
+    "mean_ndcg_at_50": 0.2983129415132108
+  },
+  "deltas": {
+    "ap_delta_calibrated_vs_baseline": 0.0015178704334937315,
+    "pr_auc_delta_calibrated_vs_baseline": 0.001630850330883185,
+    "precision_at_50_delta_vs_baseline": 0.018181818181818188,
+    "ndcg_at_50_delta_vs_baseline": 0.01233630690125867,
+    "tree_ap_delta_calibrated_vs_baseline": 0.067481678042168,
+    "tree_pr_auc_delta_calibrated_vs_baseline": 0.06700236548011627,
+    "tree_precision_at_50_delta_vs_baseline": 0.20159090909090915,
+    "tree_ndcg_at_50_delta_vs_baseline": 0.22866580392955116
+  }
+}

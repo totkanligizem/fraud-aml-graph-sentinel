@@ -47,6 +47,56 @@ def latest_json_file(directory: Path, pattern: str) -> Path:
     return matches[-1]
 
 
+def normalize_path(value: object) -> str:
+    return Path(str(value)).as_posix()
+
+
+def latest_json_file_matching_db_path(directory: Path, pattern: str, expected_db_path: str) -> Path:
+    matches = sorted(directory.glob(pattern))
+    if not matches:
+        raise FileNotFoundError(f"No files found for pattern={pattern} in {directory}")
+
+    expected = normalize_path(expected_db_path)
+    for path in reversed(matches):
+        payload = load_json(path)
+        db_path = payload.get("db_path")
+        if db_path is None:
+            continue
+        if normalize_path(db_path) == expected:
+            return path
+
+    raise FileNotFoundError(
+        f"No artifact with db_path={expected} found for pattern={pattern} in {directory}"
+    )
+
+
+def latest_model_artifacts_for_db(model_dir: Path, expected_db_path: str) -> Tuple[Dict[str, object], List[Dict[str, object]]]:
+    run_dirs = sorted(
+        path
+        for path in model_dir.iterdir()
+        if path.is_dir() and path.name != "latest"
+    )
+    expected = normalize_path(expected_db_path)
+    for run_dir in reversed(run_dirs):
+        metrics_path = run_dir / "metrics.json"
+        if not metrics_path.exists():
+            continue
+        metrics = load_json(metrics_path)
+        if normalize_path(metrics.get("db_path", "")) != expected:
+            continue
+        top_features_path = run_dir / "top_features.json"
+        if not top_features_path.exists():
+            raise FileNotFoundError(f"Missing top_features.json for model run: {run_dir}")
+        top_features = load_json(top_features_path)
+        if not isinstance(top_features, list):
+            raise ValueError(f"Invalid top_features payload: {top_features_path}")
+        return metrics, top_features
+
+    raise FileNotFoundError(
+        f"No fraud_baseline model artifacts found with db_path={expected} in {model_dir}"
+    )
+
+
 def latest_sql_run_summary(sql_path: str) -> Path:
     summaries = sorted((ARTIFACTS_DIR / "bigquery" / "sql-runs").glob("*/run-summary.json"))
     for path in reversed(summaries):
@@ -187,12 +237,27 @@ def add_bar_page(
 
 def build_snapshot() -> Dict[str, object]:
     warehouse_summary = load_json(ROOT / "data/warehouse/warehouse-build-summary.json")
+    expected_db_path = normalize_path(warehouse_summary.get("db_path", ""))
     validate_local = load_best_bigquery_state()
-    validate_pipeline = load_json(latest_json_file(ARTIFACTS_DIR / "models" / "fraud_scoring", "*/scoring-summary.json"))
-    ranking_summary = load_json(latest_json_file(ARTIFACTS_DIR / "models" / "ranking", "*/ranking-summary.json"))
+    validate_pipeline = load_json(
+        latest_json_file_matching_db_path(
+            ARTIFACTS_DIR / "models" / "fraud_scoring",
+            "*/scoring-summary.json",
+            expected_db_path,
+        )
+    )
+    ranking_summary = load_json(
+        latest_json_file_matching_db_path(
+            ARTIFACTS_DIR / "models" / "ranking",
+            "*/ranking-summary.json",
+            expected_db_path,
+        )
+    )
     graph_summary = load_json(latest_json_file(ARTIFACTS_DIR / "graph", "graph-build-summary-*.json"))
-    model_metrics = load_json(ROOT / "artifacts/models/fraud_baseline/latest/metrics.json")
-    top_features = load_json(ROOT / "artifacts/models/fraud_baseline/latest/top_features.json")
+    model_metrics, top_features = latest_model_artifacts_for_db(
+        ROOT / "artifacts/models/fraud_baseline",
+        expected_db_path,
+    )
     bq_validation_summary = load_json(latest_sql_run_summary("sql/bigquery/validation"))
     bq_graph_analytics_summary = load_json(latest_sql_run_summary("sql/bigquery/graph_analytics"))
     core_upload_summary = load_json(latest_json_file(ARTIFACTS_DIR / "bigquery", "upload-summary-*.json"))

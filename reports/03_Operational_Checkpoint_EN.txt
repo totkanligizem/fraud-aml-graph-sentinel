@@ -1,6 +1,6 @@
 Fraud - AML Graph Operational Checkpoint (EN)
 
-Generated at (UTC): 2026-03-04T21:01:32Z
+Generated at (UTC): 2026-03-05T15:09:12Z
 
 1) Executive Summary
 This checkpoint report summarizes the current working state of the local pipeline, graph layer, and BigQuery environment after the latest audit pass.
@@ -20,24 +20,24 @@ Estimated completion (inference): roughly 88% of MVP scope, roughly 70% of full-
 - transaction_event_raw: 1,184,807
 - stg_transaction_event: 1,184,807
 - transaction_mart: 1,184,807
-- feature_payer_24h: 150,000
+- feature_payer_24h: 900,000
 - monitoring_mart: 90
 - fraud_scores: 884,807
 - alert_queue queue_count: 88
 
 4) Model and Ranking State
-- Fraud baseline AP: 0.0424
-- Fraud baseline PR-AUC(trapz): 0.0424
-- Cost-optimized threshold: 0.624862
-- Mean Precision@50: 7.45%
-- Mean NDCG@50: 7.11%
+- Fraud baseline AP: 0.0710
+- Fraud baseline PR-AUC(trapz): 0.0708
+- Cost-optimized threshold: 0.725672
+- Mean Precision@50: 6.91%
+- Mean NDCG@50: 6.96%
 - Queues with positive labels: 88
 Example highest-weight features:
-  - dataset_id_ieee_cis: 0.6036 (abs)
-  - dataset_id_paysim: 0.4409 (abs)
-  - log_amount: 0.4354 (abs)
-  - txn_type_IEEE_CIS_C: 0.3605 (abs)
-  - txn_type_CARD_TRANSACTION: 0.3504 (abs)
+  - log_payer_amt_sum_24h: 0.5425 (abs)
+  - txn_type_IEEE_CIS_C: 0.3567 (abs)
+  - dataset_id_ieee_cis: 0.3382 (abs)
+  - dataset_id_paysim: 0.3326 (abs)
+  - dataset_id_creditcard_fraud: 0.3084 (abs)
 
 5) Graph State
 - graph_party_node: 582,652

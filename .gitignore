@@ -20,6 +20,12 @@ data/curated/**
 data/warehouse/**
 !data/warehouse/**/.gitkeep
 
+# Generated synthetic sample outputs
+data/sample/transaction_event/**
+!data/sample/transaction_event/.gitkeep
+data/sample/warehouse/**
+!data/sample/warehouse/.gitkeep
+
 # Generated run artifacts (models, summaries, temp exports)
 artifacts/**
 !artifacts/**/.gitkeep

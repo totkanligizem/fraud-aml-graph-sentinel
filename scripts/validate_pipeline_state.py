@@ -38,6 +38,24 @@ def parse_args() -> argparse.Namespace:
         default=["ieee_cis", "creditcard_fraud", "paysim"],
         help="Datasets expected in fraud_scores table",
     )
+    parser.add_argument(
+        "--min-feature-coverage-over-payer",
+        type=float,
+        default=0.0,
+        help=(
+            "Optional minimum coverage threshold over rows with payer_party_id "
+            "for scoring datasets (0 disables threshold check)."
+        ),
+    )
+    parser.add_argument(
+        "--min-graph-feature-coverage-over-payer",
+        type=float,
+        default=0.0,
+        help=(
+            "Optional minimum coverage threshold for feature_graph_24h over rows with payer_party_id "
+            "for scoring datasets (0 disables threshold check)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -96,6 +114,7 @@ def main() -> None:
     fraud_score_rows_by_dataset: Dict[str, int] = {}
     alert_queue_distinct_queues = 0
     quality_metrics: Dict[str, int] = {}
+    feature_coverage: Dict[str, object] = {}
     if db_path.exists():
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
@@ -104,6 +123,7 @@ def main() -> None:
             "stg_transaction_event",
             "transaction_mart",
             "feature_payer_24h",
+            "feature_graph_24h",
             "monitoring_mart",
             "fraud_scores",
             "alert_queue",
@@ -173,11 +193,144 @@ def main() -> None:
                         """
                     ).fetchone()[0]
                 ),
+                "invalid_negative_graph_feature_values": int(
+                    cur.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM feature_graph_24h
+                        WHERE graph_payer_incoming_txn_count_24h < 0
+                           OR graph_payer_unique_payees_24h < 0
+                           OR graph_pair_txn_count_30d < 0
+                           OR graph_pair_amt_sum_30d < 0
+                           OR graph_reciprocal_pair_txn_count_30d < 0
+                        """
+                    ).fetchone()[0]
+                ),
             }
             for name, value in quality_metrics.items():
                 ensure(value == 0, f"{name}: {value}", errors)
         except Exception as exc:
             errors.append(f"transaction_mart quality checks failed: {exc}")
+
+        try:
+            coverage_rows = list(
+                cur.execute(
+                    """
+                    SELECT
+                      tm.dataset_id,
+                      COUNT(*) AS transaction_rows,
+                      SUM(
+                        CASE
+                          WHEN tm.payer_party_id IS NOT NULL AND TRIM(tm.payer_party_id) <> ''
+                          THEN 1 ELSE 0
+                        END
+                      ) AS payer_rows,
+                      SUM(CASE WHEN f.event_id IS NOT NULL THEN 1 ELSE 0 END) AS feature_rows_payer_24h,
+                      SUM(CASE WHEN g.event_id IS NOT NULL THEN 1 ELSE 0 END) AS feature_rows_graph_24h
+                    FROM transaction_mart tm
+                    LEFT JOIN feature_payer_24h f
+                      ON f.event_id = tm.event_id
+                    LEFT JOIN feature_graph_24h g
+                      ON g.event_id = tm.event_id
+                    GROUP BY tm.dataset_id
+                    ORDER BY tm.dataset_id
+                    """
+                )
+            )
+
+            by_dataset: Dict[str, Dict[str, float | int | None]] = {}
+            total_transaction_rows = 0
+            total_payer_rows = 0
+            total_feature_rows = 0
+            total_graph_feature_rows = 0
+            for dataset_id, transaction_rows, payer_rows, feature_rows_payer, feature_rows_graph in coverage_rows:
+                ds = str(dataset_id)
+                tr = int(transaction_rows or 0)
+                pr = int(payer_rows or 0)
+                fr = int(feature_rows_payer or 0)
+                gr = int(feature_rows_graph or 0)
+                cov_total = (fr / tr) if tr > 0 else 0.0
+                cov_over_payer = (fr / pr) if pr > 0 else None
+                graph_cov_total = (gr / tr) if tr > 0 else 0.0
+                graph_cov_over_payer = (gr / pr) if pr > 0 else None
+                by_dataset[ds] = {
+                    "transaction_rows": tr,
+                    "payer_rows": pr,
+                    "feature_rows": fr,
+                    "graph_feature_rows": gr,
+                    "coverage_total": round(float(cov_total), 6),
+                    "coverage_over_payer_rows": None if cov_over_payer is None else round(float(cov_over_payer), 6),
+                    "graph_coverage_total": round(float(graph_cov_total), 6),
+                    "graph_coverage_over_payer_rows": None
+                    if graph_cov_over_payer is None
+                    else round(float(graph_cov_over_payer), 6),
+                }
+                total_transaction_rows += tr
+                total_payer_rows += pr
+                total_feature_rows += fr
+                total_graph_feature_rows += gr
+
+            feature_coverage = {
+                "total_transaction_rows": total_transaction_rows,
+                "total_payer_rows": total_payer_rows,
+                "total_feature_rows": total_feature_rows,
+                "coverage_total": round(float(total_feature_rows / total_transaction_rows), 6)
+                if total_transaction_rows > 0
+                else 0.0,
+                "coverage_over_payer_rows": round(float(total_feature_rows / total_payer_rows), 6)
+                if total_payer_rows > 0
+                else 0.0,
+                "total_graph_feature_rows": total_graph_feature_rows,
+                "graph_coverage_total": round(float(total_graph_feature_rows / total_transaction_rows), 6)
+                if total_transaction_rows > 0
+                else 0.0,
+                "graph_coverage_over_payer_rows": round(float(total_graph_feature_rows / total_payer_rows), 6)
+                if total_payer_rows > 0
+                else 0.0,
+                "by_dataset": by_dataset,
+            }
+
+            threshold = float(args.min_feature_coverage_over_payer)
+            if threshold > 0.0:
+                for ds in args.scoring_datasets:
+                    ds_cov = by_dataset.get(ds)
+                    if not ds_cov:
+                        errors.append(f"feature_coverage missing dataset={ds}")
+                        continue
+                    ds_payer_rows = int(ds_cov["payer_rows"])
+                    if ds_payer_rows <= 0:
+                        continue
+                    cov_val = float(ds_cov["coverage_over_payer_rows"] or 0.0)
+                    ensure(
+                        cov_val >= threshold,
+                        (
+                            f"feature coverage below threshold for dataset={ds}: "
+                            f"{cov_val:.6f} < {threshold:.6f}"
+                        ),
+                        errors,
+                    )
+
+            graph_threshold = float(args.min_graph_feature_coverage_over_payer)
+            if graph_threshold > 0.0:
+                for ds in args.scoring_datasets:
+                    ds_cov = by_dataset.get(ds)
+                    if not ds_cov:
+                        errors.append(f"graph_feature_coverage missing dataset={ds}")
+                        continue
+                    ds_payer_rows = int(ds_cov["payer_rows"])
+                    if ds_payer_rows <= 0:
+                        continue
+                    cov_val = float(ds_cov["graph_coverage_over_payer_rows"] or 0.0)
+                    ensure(
+                        cov_val >= graph_threshold,
+                        (
+                            f"graph feature coverage below threshold for dataset={ds}: "
+                            f"{cov_val:.6f} < {graph_threshold:.6f}"
+                        ),
+                        errors,
+                    )
+        except Exception as exc:
+            errors.append(f"feature coverage checks failed: {exc}")
         conn.close()
 
     # Model artifacts
@@ -199,6 +352,7 @@ def main() -> None:
         "fraud_scores_rows_by_dataset": fraud_score_rows_by_dataset,
         "alert_queue_distinct_queues": alert_queue_distinct_queues,
         "quality_metrics": quality_metrics,
+        "feature_coverage": feature_coverage,
         "errors": errors,
     }
     print(json.dumps(report, indent=2))

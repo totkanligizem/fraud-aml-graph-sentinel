@@ -28,6 +28,9 @@ class SplitData:
     y_train: np.ndarray
     x_valid: np.ndarray
     y_valid: np.ndarray
+    train_dataset_ids: np.ndarray
+    valid_dataset_ids: np.ndarray
+    split_mode: str
     feature_names: List[str]
     numeric_feature_names: List[str]
     numeric_means: np.ndarray
@@ -71,6 +74,12 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.8,
         help="Time-based train split fraction",
+    )
+    parser.add_argument(
+        "--split-mode",
+        choices=["global_time", "per_dataset_time"],
+        default="global_time",
+        help="Split strategy for train/valid partition",
     )
     parser.add_argument("--fp-cost", type=float, default=1.0, help="False positive cost")
     parser.add_argument("--fn-cost", type=float, default=25.0, help="False negative cost")
@@ -193,10 +202,17 @@ def load_training_frame(
       tm.amount,
       COALESCE(f.payer_txn_count_24h, 0.0) AS payer_txn_count_24h,
       COALESCE(f.payer_amt_sum_24h, 0.0) AS payer_amt_sum_24h,
+      COALESCE(g.graph_payer_incoming_txn_count_24h, 0.0) AS graph_payer_incoming_txn_count_24h,
+      COALESCE(g.graph_payer_unique_payees_24h, 0.0) AS graph_payer_unique_payees_24h,
+      COALESCE(g.graph_pair_txn_count_30d, 0.0) AS graph_pair_txn_count_30d,
+      COALESCE(g.graph_pair_amt_sum_30d, 0.0) AS graph_pair_amt_sum_30d,
+      COALESCE(g.graph_reciprocal_pair_txn_count_30d, 0.0) AS graph_reciprocal_pair_txn_count_30d,
       tm.label_fraud
     FROM transaction_mart tm
     LEFT JOIN feature_payer_24h f
       ON f.event_id = tm.event_id
+    LEFT JOIN feature_graph_24h g
+      ON g.event_id = tm.event_id
     WHERE tm.label_fraud IS NOT NULL
       AND tm.dataset_id = ?
     """
@@ -225,7 +241,38 @@ def load_training_frame(
     return df
 
 
-def build_feature_matrix(df: pd.DataFrame, train_time_fraction: float) -> SplitData:
+def build_split_indices(frame: pd.DataFrame, train_time_fraction: float, split_mode: str) -> Tuple[np.ndarray, np.ndarray]:
+    total_rows = len(frame)
+    if total_rows < 2:
+        raise RuntimeError("Need at least 2 rows to create train/valid split.")
+
+    if split_mode == "per_dataset_time":
+        train_idx_list: List[int] = []
+        valid_idx_list: List[int] = []
+        for _, group in frame.groupby("dataset_id", sort=False):
+            idx = group.index.to_numpy(dtype=np.int64)
+            n = len(idx)
+            if n < 2:
+                train_idx_list.extend(idx.tolist())
+                continue
+            split_idx = int(n * train_time_fraction)
+            split_idx = max(1, min(split_idx, n - 1))
+            train_idx_list.extend(idx[:split_idx].tolist())
+            valid_idx_list.extend(idx[split_idx:].tolist())
+
+        if valid_idx_list:
+            train_idx = np.array(sorted(train_idx_list), dtype=np.int64)
+            valid_idx = np.array(sorted(valid_idx_list), dtype=np.int64)
+            return train_idx, valid_idx
+
+    split_idx = int(total_rows * train_time_fraction)
+    split_idx = max(1, min(split_idx, total_rows - 1))
+    train_idx = np.arange(0, split_idx, dtype=np.int64)
+    valid_idx = np.arange(split_idx, total_rows, dtype=np.int64)
+    return train_idx, valid_idx
+
+
+def build_feature_matrix(df: pd.DataFrame, train_time_fraction: float, split_mode: str) -> SplitData:
     frame = df.copy()
     frame["event_time"] = pd.to_datetime(frame["event_time"], errors="coerce")
     frame = frame.dropna(subset=["event_time", "label_fraud"]).reset_index(drop=True)
@@ -234,9 +281,21 @@ def build_feature_matrix(df: pd.DataFrame, train_time_fraction: float) -> SplitD
     frame["amount"] = pd.to_numeric(frame["amount"], errors="coerce").fillna(0.0)
     frame["payer_txn_count_24h"] = pd.to_numeric(frame["payer_txn_count_24h"], errors="coerce").fillna(0.0)
     frame["payer_amt_sum_24h"] = pd.to_numeric(frame["payer_amt_sum_24h"], errors="coerce").fillna(0.0)
+    frame["graph_payer_incoming_txn_count_24h"] = (
+        pd.to_numeric(frame["graph_payer_incoming_txn_count_24h"], errors="coerce").fillna(0.0)
+    )
+    frame["graph_payer_unique_payees_24h"] = (
+        pd.to_numeric(frame["graph_payer_unique_payees_24h"], errors="coerce").fillna(0.0)
+    )
+    frame["graph_pair_txn_count_30d"] = pd.to_numeric(frame["graph_pair_txn_count_30d"], errors="coerce").fillna(0.0)
+    frame["graph_pair_amt_sum_30d"] = pd.to_numeric(frame["graph_pair_amt_sum_30d"], errors="coerce").fillna(0.0)
+    frame["graph_reciprocal_pair_txn_count_30d"] = (
+        pd.to_numeric(frame["graph_reciprocal_pair_txn_count_30d"], errors="coerce").fillna(0.0)
+    )
 
     frame["log_amount"] = np.log1p(frame["amount"].clip(lower=0))
     frame["log_payer_amt_sum_24h"] = np.log1p(frame["payer_amt_sum_24h"].clip(lower=0))
+    frame["log_graph_pair_amt_sum_30d"] = np.log1p(frame["graph_pair_amt_sum_30d"].clip(lower=0))
     frame["hour_of_day"] = frame["event_time"].dt.hour.astype(np.float64)
     frame["day_of_week"] = frame["event_time"].dt.dayofweek.astype(np.float64)
 
@@ -244,6 +303,11 @@ def build_feature_matrix(df: pd.DataFrame, train_time_fraction: float) -> SplitD
         "log_amount",
         "payer_txn_count_24h",
         "log_payer_amt_sum_24h",
+        "graph_payer_incoming_txn_count_24h",
+        "graph_payer_unique_payees_24h",
+        "graph_pair_txn_count_30d",
+        "log_graph_pair_amt_sum_30d",
+        "graph_reciprocal_pair_txn_count_30d",
         "hour_of_day",
         "day_of_week",
     ]
@@ -257,14 +321,19 @@ def build_feature_matrix(df: pd.DataFrame, train_time_fraction: float) -> SplitD
     )
     x_df = pd.concat([frame[numeric_cols].astype(np.float64), cat_frame], axis=1)
     y = frame["label_fraud"].astype(np.int64).to_numpy()
+    dataset_ids = frame["dataset_id"].fillna("UNKNOWN").astype(str).to_numpy()
 
-    split_idx = int(len(frame) * train_time_fraction)
-    split_idx = max(1, min(split_idx, len(frame) - 1))
-
-    x_train_df = x_df.iloc[:split_idx].copy()
-    x_valid_df = x_df.iloc[split_idx:].copy()
-    y_train = y[:split_idx]
-    y_valid = y[split_idx:]
+    train_idx, valid_idx = build_split_indices(
+        frame=frame,
+        train_time_fraction=train_time_fraction,
+        split_mode=split_mode,
+    )
+    x_train_df = x_df.iloc[train_idx].copy()
+    x_valid_df = x_df.iloc[valid_idx].copy()
+    y_train = y[train_idx]
+    y_valid = y[valid_idx]
+    train_dataset_ids = dataset_ids[train_idx]
+    valid_dataset_ids = dataset_ids[valid_idx]
 
     # Standardize only numeric columns using train stats.
     means = x_train_df[numeric_cols].mean().to_numpy(dtype=np.float64)
@@ -292,11 +361,42 @@ def build_feature_matrix(df: pd.DataFrame, train_time_fraction: float) -> SplitD
         y_train=y_train,
         x_valid=x_valid,
         y_valid=y_valid,
+        train_dataset_ids=train_dataset_ids,
+        valid_dataset_ids=valid_dataset_ids,
+        split_mode=split_mode,
         feature_names=feature_names,
         numeric_feature_names=numeric_cols,
         numeric_means=means,
         numeric_stds=stds,
     )
+
+
+def counts_by_dataset(dataset_ids: np.ndarray) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for ds, cnt in zip(*np.unique(dataset_ids.astype(str), return_counts=True)):
+        counts[str(ds)] = int(cnt)
+    return counts
+
+
+def metrics_by_dataset(y_true: np.ndarray, scores: np.ndarray, dataset_ids: np.ndarray) -> Dict[str, Dict[str, float]]:
+    output: Dict[str, Dict[str, float]] = {}
+    for ds in sorted(np.unique(dataset_ids.astype(str)).tolist()):
+        mask = dataset_ids.astype(str) == ds
+        y_ds = y_true[mask]
+        s_ds = scores[mask]
+        positives = int(np.sum(y_ds == 1))
+        negatives = int(np.sum(y_ds == 0))
+        ap = average_precision_score_np(y_ds, s_ds) if len(y_ds) > 0 else 0.0
+        pr_auc = pr_auc_trapz(y_ds, s_ds) if len(y_ds) > 1 else 0.0
+        output[ds] = {
+            "rows": int(len(y_ds)),
+            "positives": positives,
+            "negatives": negatives,
+            "positive_rate": float(positives / len(y_ds)) if len(y_ds) > 0 else 0.0,
+            "average_precision": float(ap),
+            "pr_auc_trapz": float(pr_auc),
+        }
+    return output
 
 
 def train_logistic_regression(
@@ -390,10 +490,21 @@ def main() -> None:
         raise RuntimeError("No training rows loaded. Check datasets/warehouse build.")
     print(f"[INFO] loaded_rows={len(df)}", flush=True)
 
-    split = build_feature_matrix(df, train_time_fraction=args.train_time_fraction)
+    split = build_feature_matrix(
+        df,
+        train_time_fraction=args.train_time_fraction,
+        split_mode=args.split_mode,
+    )
     print(
         f"[INFO] train_rows={len(split.y_train)} valid_rows={len(split.y_valid)} "
-        f"features={len(split.feature_names)}",
+        f"features={len(split.feature_names)} split_mode={split.split_mode}",
+        flush=True,
+    )
+    print(
+        "[INFO] split_dataset_rows train="
+        + json.dumps(counts_by_dataset(split.train_dataset_ids), ensure_ascii=False)
+        + " valid="
+        + json.dumps(counts_by_dataset(split.valid_dataset_ids), ensure_ascii=False),
         flush=True,
     )
 
@@ -455,6 +566,17 @@ def main() -> None:
         "metrics": {
             "average_precision": float(ap),
             "pr_auc_trapz": float(pr_auc),
+        },
+        "metrics_by_dataset": metrics_by_dataset(
+            y_true=split.y_valid,
+            scores=valid_scores,
+            dataset_ids=split.valid_dataset_ids,
+        ),
+        "split": {
+            "mode": split.split_mode,
+            "train_time_fraction": float(args.train_time_fraction),
+            "train_rows_by_dataset": counts_by_dataset(split.train_dataset_ids),
+            "valid_rows_by_dataset": counts_by_dataset(split.valid_dataset_ids),
         },
         "cost_optimized_threshold": cost_best,
         "training": {
