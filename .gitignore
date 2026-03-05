@@ -49,3 +49,7 @@ api keys/
 
 # Local operator screenshots / notes
 gerekli ss ler/
+
+# Generated social-media assets
+social_media/**
+!social_media/.gitkeep

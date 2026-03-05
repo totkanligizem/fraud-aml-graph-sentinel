@@ -1,6 +1,6 @@
 Fraud - AML Graph Operational Checkpoint (TR)
 
-Tarih (UTC): 2026-03-05T18:03:47Z
+Tarih (UTC): 2026-03-05T18:44:22Z
 
 1) Yonetici Ozeti
 Bu checkpoint raporu, local pipeline + graph layer + BigQuery state icin son audit sonrasindaki gercek calisir durumu ozetler.

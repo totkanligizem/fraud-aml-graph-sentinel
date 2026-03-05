@@ -33,6 +33,7 @@ As of **2026-03-05 UTC**, all core quality gates passed and the project is in a 
 - [14. Dashboard and How to Open It](#14-dashboard-and-how-to-open-it)
 - [15. Security, Secrets, and Safe Open-Source Push](#15-security-secrets-and-safe-open-source-push)
 - [16. What Was Achieved, and What Can Be Extended Next](#16-what-was-achieved-and-what-can-be-extended-next)
+- [17. Social Media Kit (LinkedIn and GitHub)](#17-social-media-kit-linkedin-and-github)
 
 ## 1. Project Name, Topic, Scope
 
@@ -417,6 +418,7 @@ Fraud - AML Graph/
 │       ├── analyst_validation/
 │       └── validation/
 ├── docs/
+│   └── SOCIAL_MEDIA_PLAYBOOK.md
 ├── schemas/
 │   └── transaction_event.schema.json
 ├── tests/
@@ -501,6 +503,7 @@ make tree-shap
 Engineering quality suite:
 
 ```bash
+make setup-dev
 make quality-local
 ```
 
@@ -669,6 +672,21 @@ Open:
 3. Add CI pipeline (lint + smoke + validator suite) for every commit.
 4. Add scenario simulation and what-if queue stress testing.
 5. Add human-in-the-loop feedback capture from analyst actions into retraining loops.
+
+## 17. Social Media Kit (LinkedIn and GitHub)
+
+Generate showcase videos and post captions from current project snapshots:
+
+```bash
+make social-kit
+```
+
+Outputs:
+
+- LinkedIn videos (9:16): `social_media/videos/linkedin_showcase_en.mp4`, `social_media/videos/linkedin_showcase_tr.mp4`
+- GitHub videos (16:9): `social_media/videos/github_showcase_en.mp4`, `social_media/videos/github_showcase_tr.mp4`
+- Caption drafts: `social_media/captions/linkedin_post_en.md`, `social_media/captions/linkedin_post_tr.md`
+- Publishing guide: `docs/SOCIAL_MEDIA_PLAYBOOK.md`
 
 ---
 

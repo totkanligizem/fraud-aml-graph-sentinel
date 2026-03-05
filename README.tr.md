@@ -33,6 +33,7 @@ Dolandiricilik (Fraud) ve kara para aklama ile mucadele (AML) icin uctan uca bir
 - [14. Dashboard Nasil Acilir](#14-dashboard-nasil-acilir)
 - [15. Guvenlik, Secret Yonetimi ve Guvenli Open-Source Push](#15-guvenlik-secret-yonetimi-ve-guvenli-open-source-push)
 - [16. Tamamlananlar ve Sonraki Gelisim Alanlari](#16-tamamlananlar-ve-sonraki-gelisim-alanlari)
+- [17. Sosyal Medya Kiti (LinkedIn ve GitHub)](#17-sosyal-medya-kiti-linkedin-ve-github)
 
 ## 1. Proje Adi, Konusu, Kapsami
 
@@ -420,6 +421,7 @@ Fraud - AML Graph/
 │       ├── analyst_validation/
 │       └── validation/
 ├── docs/
+│   └── SOCIAL_MEDIA_PLAYBOOK.md
 ├── schemas/
 │   └── transaction_event.schema.json
 ├── tests/
@@ -504,6 +506,7 @@ make tree-shap
 Muhendislik kalite paketi:
 
 ```bash
+make setup-dev
 make quality-local
 ```
 
@@ -672,6 +675,21 @@ Acilis adresi:
 3. CI pipeline'i (lint + smoke + validator suite) branch politikalarina gore zorunlu hale getirmek.
 4. Senaryo simulasyonu ve what-if queue stress test katmani eklemek.
 5. Analist aksiyonlarini retraining dongusune geri besleyen human-in-the-loop mekanizmasi eklemek.
+
+## 17. Sosyal Medya Kiti (LinkedIn ve GitHub)
+
+Guncel proje snapshot'larindan tanitim videolari ve paylasim metinleri uretmek icin:
+
+```bash
+make social-kit
+```
+
+Ciktilar:
+
+- LinkedIn videolari (9:16): `social_media/videos/linkedin_showcase_en.mp4`, `social_media/videos/linkedin_showcase_tr.mp4`
+- GitHub videolari (16:9): `social_media/videos/github_showcase_en.mp4`, `social_media/videos/github_showcase_tr.mp4`
+- Paylasim metin taslaklari: `social_media/captions/linkedin_post_en.md`, `social_media/captions/linkedin_post_tr.md`
+- Yayinlama kilavuzu: `docs/SOCIAL_MEDIA_PLAYBOOK.md`
 
 ---
 

@@ -9,7 +9,7 @@ GCP_PROJECT_ID ?= fraud-aml-graph
 BQ_DATASET ?= fraud_aml_graph_dev
 BQ_LOCATION ?= EU
 
-.PHONY: setup-dev check-datasets validate-schema ingest-smoke ingest-core ingest-ibm-1m warehouse-smoke warehouse-core train-fraud-smoke train-fraud train-fraud-benchmark train-fraud-tree score-fraud-smoke score-fraud-benchmark score-fraud-tree build-queue-smoke build-queue-benchmark build-queue-tree validate-state cleanup-incomplete-dry-run cleanup-incomplete-apply graph-build graph-validate setup-gcp-local bq-test sqlite-to-bq-smoke sqlite-to-bq-core sqlite-to-bq-full sqlite-graph-to-bq bq-create-analytics bq-create-graph-analytics bq-create-executive-views validate-executive-sql bq-validate-executive-views validate-analyst-sql agent-casebook agent-casebook-validate agent-prompt-pack agent-prompt-pack-validate agent-vertex-smoke agent-vertex-validate agent-vertex-batch agent-vertex-batch-validate agent-prompt-eval vertex-to-bq bq-create-analyst-views bq-validate-analyst-views bq-analyst-check bq-run-validation-sql bq-validate-state bq-validate-graph-state bq-full-check bq-graph-check bq-refresh-from-local-full report-checkpoint dashboard-build dashboard-check report-briefing report-master report-master-en report-model-compare model-benchmark-pipeline tree-benchmark-pipeline tree-shap lint format-check test security-audit quality-local sample-generate sample-warehouse sample-train sample-score sample-queue sample-graph sample-validate sample-e2e
+.PHONY: setup-dev check-datasets validate-schema ingest-smoke ingest-core ingest-ibm-1m warehouse-smoke warehouse-core train-fraud-smoke train-fraud train-fraud-benchmark train-fraud-tree score-fraud-smoke score-fraud-benchmark score-fraud-tree build-queue-smoke build-queue-benchmark build-queue-tree validate-state cleanup-incomplete-dry-run cleanup-incomplete-apply graph-build graph-validate setup-gcp-local bq-test sqlite-to-bq-smoke sqlite-to-bq-core sqlite-to-bq-full sqlite-graph-to-bq bq-create-analytics bq-create-graph-analytics bq-create-executive-views validate-executive-sql bq-validate-executive-views validate-analyst-sql agent-casebook agent-casebook-validate agent-prompt-pack agent-prompt-pack-validate agent-vertex-smoke agent-vertex-validate agent-vertex-batch agent-vertex-batch-validate agent-prompt-eval vertex-to-bq bq-create-analyst-views bq-validate-analyst-views bq-analyst-check bq-run-validation-sql bq-validate-state bq-validate-graph-state bq-full-check bq-graph-check bq-refresh-from-local-full report-checkpoint dashboard-build dashboard-check report-briefing report-master report-master-en report-model-compare model-benchmark-pipeline tree-benchmark-pipeline tree-shap social-kit lint format-check test security-audit quality-local sample-generate sample-warehouse sample-train sample-score sample-queue sample-graph sample-validate sample-e2e
 
 setup-dev:
 	$(PYTHON) -m pip install --upgrade pip
@@ -197,6 +197,9 @@ tree-benchmark-pipeline: train-fraud-tree score-fraud-tree build-queue-tree repo
 
 tree-shap:
 	$(PYTHON) scripts/generate_tree_shap_summary.py --model-path artifacts/models/fraud_tree_benchmark/latest/model.pkl
+
+social-kit:
+	$(PYTHON) scripts/generate_social_media_kit.py
 
 lint:
 	$(RUFF) check scripts tests
