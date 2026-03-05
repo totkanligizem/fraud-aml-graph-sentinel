@@ -2,6 +2,38 @@
 
 Turkish version (TR): [README.tr.md](README.tr.md)
 
+## Dashboard Screenshots
+
+Full folder: [dashboard-screenshots](dashboard-screenshots)
+
+<table>
+  <tr>
+    <td><img src="dashboard-screenshots/01_executive-risk-surface-overview.png" alt="Executive Risk Surface Overview" width="100%"></td>
+    <td><img src="dashboard-screenshots/02_operational-pulse-kpi-completion.png" alt="Operational Pulse KPI Completion" width="100%"></td>
+    <td><img src="dashboard-screenshots/03_volume-incident-rhythm-zero-defect.png" alt="Volume Incident Rhythm Zero Defect" width="100%"></td>
+  </tr>
+  <tr>
+    <td><img src="dashboard-screenshots/04_coverage-label-mix-risk-buckets.png" alt="Coverage Label Mix Risk Buckets" width="100%"></td>
+    <td><img src="dashboard-screenshots/05_ranking-stability-flow-integrity.png" alt="Ranking Stability Flow Integrity" width="100%"></td>
+    <td><img src="dashboard-screenshots/06_feature-pressure-cluster-watchlist.png" alt="Feature Pressure Cluster Watchlist" width="100%"></td>
+  </tr>
+  <tr>
+    <td><img src="dashboard-screenshots/07_node-exposure-network-pressure.png" alt="Node Exposure Network Pressure" width="100%"></td>
+    <td><img src="dashboard-screenshots/08_gemini-case-surface-analyst-copilot.png" alt="Gemini Case Surface Analyst Copilot" width="100%"></td>
+    <td><img src="dashboard-screenshots/09_artifacts-evidence-chain.png" alt="Artifacts Evidence Chain" width="100%"></td>
+  </tr>
+  <tr>
+    <td><img src="dashboard-screenshots/10_dataset-lens-ibm-aml-data.png" alt="Dataset Lens IBM AML Data" width="100%"></td>
+    <td><img src="dashboard-screenshots/11_dataset-lens-ieee-cis.png" alt="Dataset Lens IEEE CIS" width="100%"></td>
+    <td><img src="dashboard-screenshots/12_dataset-lens-paysim.png" alt="Dataset Lens PaySim" width="100%"></td>
+  </tr>
+  <tr>
+    <td><img src="dashboard-screenshots/13_dataset-lens-creditcard-fraud.png" alt="Dataset Lens Credit Card Fraud" width="100%"></td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
+
 An end-to-end fraud and anti-money-laundering (AML) intelligence project that unifies:
 
 - multi-source transaction ingestion,
@@ -13,9 +45,31 @@ An end-to-end fraud and anti-money-laundering (AML) intelligence project that un
 - Vertex AI Gemini analyst copilot,
 - and a publish-ready executive dashboard.
 
-As of the **latest checkpoint snapshot timestamp**, all core quality gates passed and the project is in a **READY FOR PUBLISH** state.
-State is derived from checkpoint and dashboard validator artifacts:
+As of the **latest checkpoint snapshot timestamp**, all core quality gates passed and the project is in a **READY FOR PUBLISH** state.  
+State is derived from checkpoint and dashboard validator artifacts:  
 `reports/03_Operational_Checkpoint_Snapshot.json` and `dashboard/dashboard-data.json`.
+
+## Table of Contents
+
+- [Dashboard Screenshots](#dashboard-screenshots)
+- [1. Project Name, Topic, Scope](#1-project-name-topic-scope)
+- [2. Purpose, Objectives, and Targets](#2-purpose-objectives-and-targets)
+- [3. Business Questions and Problems Solved](#3-business-questions-and-problems-solved)
+- [4. End-to-End Architecture and Workflow](#4-end-to-end-architecture-and-workflow)
+- [5. Data Sources](#5-data-sources)
+- [6. Methodology (From Raw Data to Decision Layer)](#6-methodology-from-raw-data-to-decision-layer)
+- [7. Agents, Models, and Their Functions](#7-agents-models-and-their-functions)
+- [8. Statistical and Analytical Methods](#8-statistical-and-analytical-methods)
+- [9. Technology Stack and Tools](#9-technology-stack-and-tools)
+- [10. Repository Structure](#10-repository-structure)
+- [11. Pipeline Stages and Commands](#11-pipeline-stages-and-commands)
+- [12. Validation, Testing, and Quality Gates](#12-validation-testing-and-quality-gates)
+- [13. Current Results Snapshot](#13-current-results-snapshot)
+- [14. Dashboard and How to Open It](#14-dashboard-and-how-to-open-it)
+- [15. Security, Secrets, and Safe Open-Source Push](#15-security-secrets-and-safe-open-source-push)
+- [16. What Was Achieved, and What Can Be Extended Next](#16-what-was-achieved-and-what-can-be-extended-next)
+- [17. Social Media Kit (LinkedIn and GitHub)](#17-social-media-kit-linkedin-and-github)
+
 
 ## Table of Contents
 
