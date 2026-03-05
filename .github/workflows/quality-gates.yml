@@ -26,6 +26,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
+      - name: Secret pattern scan (tracked files)
+        run: |
+          python scripts/validate_no_secrets_tracked.py
+
       - name: Ruff
         run: |
           ruff check scripts tests

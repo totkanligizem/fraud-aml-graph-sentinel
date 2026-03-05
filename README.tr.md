@@ -6,14 +6,16 @@ Dolandiricilik (Fraud) ve kara para aklama ile mucadele (AML) icin uctan uca bir
 
 - cok kaynakli islem verisi ingestion,
 - deterministic feature/warehouse modelleme,
-- istatistiksel fraud skorlama,
+- olasiliksal fraud skorlama,
 - arastirma kuyrugu onceliklendirme,
 - graph/network zeka katmani,
 - BigQuery semantik analiz katmani,
 - Vertex AI Gemini analist copilot,
 - ve yayinlanmaya hazir executive dashboard.
 
-**2026-03-05 UTC** itibariyla tum ana kalite kapilari gecmistir ve proje **READY FOR PUBLISH** durumundadir.
+**Guncel checkpoint snapshot timestamp'i** itibariyla tum ana kalite kapilari gecmistir ve proje **READY FOR PUBLISH** durumundadir.
+Durum, checkpoint ve dashboard validator artefactlarindan turetilir:
+`reports/03_Operational_Checkpoint_Snapshot.json` ve `dashboard/dashboard-data.json`.
 
 ## Icindekiler
 
@@ -64,7 +66,7 @@ ayni anda cevap verebilmek.
 
 - Farkli fraud/AML datasetlerini tek bir canonical semada normalize etmek.
 - Deterministic ve tekrar calistirilabilir pipeline yapisi kurmak (artifact-first tasarim).
-- Istatistiksel olarak savunulabilir fraud olasiliklari ve queue siralamasi uretmek.
+- Olasiliksal olarak savunulabilir fraud skorlar ve queue siralamasi uretmek.
 - Kararlari graph/network risk baglami ile zenginlestirmek.
 - Yapilandirilmis Gemini analist ciktilarini ayni analitik yuzeye almak.
 - Yayin kalitesini acik validation gate'leri ile garanti etmek.
@@ -130,6 +132,10 @@ flowchart TD
 - `ibm_amlsim`
 - `elliptic`
 
+Dataset lisans notu:
+- Datasetler bu repository icinde yeniden dagitilmaz.
+- Her dataset orijinal kaynagindan alinmali ve ilgili lisans/kullanim kosullarina uyulmalidir.
+
 ## 6. Metodoloji (Raw Veriden Karar Katmanina)
 
 ### 6.1 Canonical Ingestion
@@ -150,8 +156,11 @@ Olusturulan tablolar:
 - `stg_transaction_event`
 - `transaction_mart`
 - `feature_payer_24h` (point-in-time safe 24 saatlik payer aktivite feature'lari)
-- `feature_graph_24h` (point-in-time safe party/edge interaction feature'lari)
+- `feature_graph_24h` (point-in-time safe party/edge interaction feature'lari; karmali pencere icerir)
 - `monitoring_mart` (gunluk monitoring aggregate'leri)
+
+Isimlendirme notu:
+- `feature_graph_24h` tablo adi legacy'dir. Icindeki kolonlar hem 24h hem 30d interaction pencereleri icerir.
 
 Tasarim tercihleri:
 
@@ -187,6 +196,21 @@ Feature engineering:
   `graph_pair_txn_count_30d`, `log_graph_pair_amt_sum_30d`, `graph_reciprocal_pair_txn_count_30d`,
   `hour_of_day`, `day_of_week`
 - Kategorik one-hot: `dataset_id`, `channel`, `txn_type`, `currency`
+
+### 6.3.1 Feature set kaniti (baseline vs graph-aware benchmark)
+
+| Track | Feature kapsami | AP | PR-AUC | Mean Precision@50 |
+|---|---|---:|---:|---:|
+| Baseline | cekirdek sayisal + kategorik | 0.0710 | 0.0708 | 6.91% |
+| Benchmark | baseline + graph interaction feature'lari | 0.0725 | 0.0725 | 8.73% |
+| Tree benchmark | benchmark feature'lari + non-linear model | 0.1385 | 0.1378 | 27.07% |
+
+Benchmarklerde kullanilan graph interaction kolonlari:
+- `graph_payer_incoming_txn_count_24h`
+- `graph_payer_unique_payees_24h`
+- `graph_pair_txn_count_30d`
+- `log_graph_pair_amt_sum_30d`
+- `graph_reciprocal_pair_txn_count_30d`
 
 ### 6.4 Queue Ranking Katmani
 
@@ -314,10 +338,11 @@ Uretilen ciktilar:
 
 ### Cloud ve platform
 
-- Google Cloud Project: `fraud-aml-graph`
-- BigQuery dataset: `fraud_aml_graph_dev`
-- Vertex AI region: `europe-west4`
-- Cloud Storage bucket (runtime artifact): `fraud-aml-graph-vertex-ew4`
+Ornek isimler (kendinize gore degistirin):
+- Google Cloud Project: `YOUR_GCP_PROJECT_ID`
+- BigQuery dataset: `YOUR_BQ_DATASET`
+- Vertex AI region: `YOUR_VERTEX_REGION`
+- Cloud Storage bucket (runtime artifact): `YOUR_VERTEX_BUCKET`
 
 ### Diller
 
@@ -356,7 +381,7 @@ python3 -m pip install --upgrade pip
 python3 -m pip install -r requirements.txt
 ```
 
-Muhendislik arac zinciri (test/lint/security/XAI):
+Muhendislik arac zinciri (test/lint/security/opsiyonel SHAP explainability):
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
@@ -367,16 +392,21 @@ make setup-dev
 Cloud script'lerinin bekledigi environment variable'lar:
 
 ```bash
-export GCP_PROJECT_ID="fraud-aml-graph"
-export BQ_DATASET="fraud_aml_graph_dev"
-export BQ_LOCATION="EU"
+export GCP_PROJECT_ID="your-gcp-project-id"
+export BQ_DATASET="your_bq_dataset"
+export BQ_LOCATION="YOUR_BQ_LOCATION"
 export GOOGLE_APPLICATION_CREDENTIALS="/absolute/path/to/your/service-account.json"
 ```
+
+Dependency yonetimi notu:
+- Runtime icin canonical dosya `requirements.txt`'dir.
+- `requirements.lock` generated/locked cikti dosyasidir; manuel duzenlenmez.
+- `pyproject.toml` arac konfigrasyonu (format/lint) icindir; birincil runtime dependency kaynagi degildir.
 
 ## 10. Repository Yapisi
 
 ```text
-Fraud - AML Graph/
+fraud-aml-graph-sentinel/
 ├── Makefile
 ├── README.md
 ├── README.tr.md
@@ -478,10 +508,13 @@ make bq-analyst-check
 ### 11.5 Dashboard + final raporlama
 
 ```bash
+make dashboard-build
 make dashboard-check
 make report-master
 make report-master-en
 ```
+
+`dashboard-build` bundle payload'ini uretir; `dashboard-check` payload + DOM butunlugunu dogrular.
 
 ### 11.6 Benchmark model ve karsilastirma
 
@@ -537,6 +570,8 @@ Validation yaklasimi explicit ve script-driven'dir; implicit degildir.
   - queue ayrismasi/tutarlilik kontrolleri
   - kritik veri kalitesi null/domain/collision kontrolleri
   - `feature_payer_24h` ve `feature_graph_24h` coverage threshold kontrolleri
+- `validate_no_secrets_tracked.py`
+  - git-tracked dosyalarda key/token/private-key pattern taramasi yapar
 
 ### Graph gate'leri
 
@@ -583,6 +618,7 @@ Validation yaklasimi explicit ve script-driven'dir; implicit degildir.
 
 - GitHub Actions workflow: `.github/workflows/quality-gates.yml`
 - Su adimlari calistirir:
+  - `python scripts/validate_no_secrets_tracked.py`
   - `ruff check scripts tests`
   - `black --check scripts tests`
   - `pytest`
@@ -616,15 +652,17 @@ Kaynak: guncel checkpoint ve model-comparison snapshot'lari.
 - Dashboard defect: **0**
 - BigQuery state gate: **PASS**
 - Vertex analyst error count: **0**
-- Final readiness: **READY FOR PUBLISH**
+- Final readiness: **READY FOR PUBLISH** (guncel checkpoint + dashboard validator artefactlarindan)
 
 ## 14. Dashboard Nasil Acilir
 
 Local build ve servis:
 
 ```bash
-cd "Fraud - AML Graph"
+# Clone klasor adiniz farkliysa local repository yolunuzu kullanin.
+cd fraud-aml-graph-sentinel
 make dashboard-build
+make dashboard-check
 python3 -m http.server 8080
 ```
 
@@ -639,12 +677,15 @@ Acilis adresi:
 - Service-account JSON anahtarlari sadece local tutulur ve gitignore'dadir.
 - `.secrets/`, `api keys/`, `.env*` varsayilan olarak ignore edilir.
 - Ek key-benzeri uzantilar ignore edilir (`*.pem`, `*.p12`, `*.pfx`, `*.key`, `*service-account*.json`, `*credentials*.json`).
+- BigQuery production hardening tarafinda PII kolonlari icin policy-tag/column-level masking ve row-level kontrol uygulanmalidir.
 
 ### Push oncesi kontrol
 
 - `git status` icinde key dosyasi olmadigini dogrula.
 - Kimlik bilgilerini sadece local ignore edilen path'lerde tut.
 - Gecmiste herhangi bir key sizdiysa repo'yu public yapmadan once rotate/revoke et.
+- Tracked dosyalarda secret taramasi calistir:
+  - `make secret-scan-tracked`
 
 ## 16. Tamamlananlar ve Sonraki Gelisim Alanlari
 

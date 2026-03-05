@@ -64,7 +64,7 @@ Olusturulacak hesap:
 - `vertex-aml-agent`
 
 Beklenen email formati:
-- `vertex-aml-agent@fraud-aml-graph.iam.gserviceaccount.com`
+- `vertex-aml-agent@YOUR_GCP_PROJECT_ID.iam.gserviceaccount.com`
 
 Aciklama:
 - `Fraud AML analyst copilot runtime identity`
@@ -85,7 +85,7 @@ Eger agent Cloud Storage artifact/bellek okuyacaksa ekle:
 ## 5) Cloud Storage bucket hazirla
 
 Olustur:
-- Bucket name: `fraud-aml-graph-vertex-ew4`
+- Bucket name (ornek): `your-project-vertex-ew4`
 - Region: `europe-west4`
 - Access control: Uniform
 - Public access: kapali
@@ -147,7 +147,7 @@ Zorunlu olanlar:
    - `Vertex AI User`
    - `BigQuery Data Viewer`
    - `BigQuery Job User`
-4. `fraud-aml-graph-vertex-ew4` bucket'ini olustur
+4. `your-project-vertex-ew4` (veya benzeri) bucket'ini olustur
 
 Istege bagli:
 5. Test icin Vertex API key al

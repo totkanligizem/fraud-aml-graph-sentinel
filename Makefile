@@ -8,8 +8,12 @@ GCP_KEY_PATH ?= .secrets/gcp-service-account.json
 GCP_PROJECT_ID ?= fraud-aml-graph
 BQ_DATASET ?= fraud_aml_graph_dev
 BQ_LOCATION ?= EU
+VERTEX_LOCATION ?= europe-west4
+VERTEX_MODEL ?= gemini-2.5-flash
+VERTEX_FALLBACK_MODEL ?= gemini-2.5-pro
+VERTEX_CREDENTIALS_PATH ?= $(GCP_KEY_PATH)
 
-.PHONY: setup-dev check-datasets validate-schema ingest-smoke ingest-core ingest-ibm-1m warehouse-smoke warehouse-core train-fraud-smoke train-fraud train-fraud-benchmark train-fraud-tree score-fraud-smoke score-fraud-benchmark score-fraud-tree build-queue-smoke build-queue-benchmark build-queue-tree validate-state cleanup-incomplete-dry-run cleanup-incomplete-apply graph-build graph-validate setup-gcp-local bq-test sqlite-to-bq-smoke sqlite-to-bq-core sqlite-to-bq-full sqlite-graph-to-bq bq-create-analytics bq-create-graph-analytics bq-create-executive-views validate-executive-sql bq-validate-executive-views validate-analyst-sql agent-casebook agent-casebook-validate agent-prompt-pack agent-prompt-pack-validate agent-vertex-smoke agent-vertex-validate agent-vertex-batch agent-vertex-batch-validate agent-prompt-eval vertex-to-bq bq-create-analyst-views bq-validate-analyst-views bq-analyst-check bq-run-validation-sql bq-validate-state bq-validate-graph-state bq-full-check bq-graph-check bq-refresh-from-local-full report-checkpoint dashboard-build dashboard-check report-briefing report-master report-master-en report-model-compare model-benchmark-pipeline tree-benchmark-pipeline tree-shap social-kit lint format-check test security-audit quality-local sample-generate sample-warehouse sample-train sample-score sample-queue sample-graph sample-validate sample-e2e
+.PHONY: setup-dev check-datasets validate-schema ingest-smoke ingest-core ingest-ibm-1m warehouse-smoke warehouse-core train-fraud-smoke train-fraud train-fraud-benchmark train-fraud-tree score-fraud-smoke score-fraud-benchmark score-fraud-tree build-queue-smoke build-queue-benchmark build-queue-tree validate-state cleanup-incomplete-dry-run cleanup-incomplete-apply graph-build graph-validate setup-gcp-local bq-test sqlite-to-bq-smoke sqlite-to-bq-core sqlite-to-bq-full sqlite-graph-to-bq bq-create-analytics bq-create-graph-analytics bq-create-executive-views validate-executive-sql bq-validate-executive-views validate-analyst-sql agent-casebook agent-casebook-validate agent-prompt-pack agent-prompt-pack-validate agent-vertex-smoke agent-vertex-validate agent-vertex-batch agent-vertex-batch-validate agent-prompt-eval vertex-to-bq bq-create-analyst-views bq-validate-analyst-views bq-analyst-check bq-run-validation-sql bq-validate-state bq-validate-graph-state bq-full-check bq-graph-check bq-refresh-from-local-full report-checkpoint dashboard-build dashboard-check report-briefing report-master report-master-en report-model-compare model-benchmark-pipeline tree-benchmark-pipeline tree-shap social-kit secret-scan-tracked lint format-check test security-audit quality-local sample-generate sample-warehouse sample-train sample-score sample-queue sample-graph sample-validate sample-e2e
 
 setup-dev:
 	$(PYTHON) -m pip install --upgrade pip
@@ -130,13 +134,13 @@ agent-prompt-pack-validate: agent-prompt-pack
 	$(PYTHON) scripts/validate_analyst_prompt_pack.py
 
 agent-vertex-smoke: agent-prompt-pack
-	$(PYTHON) scripts/run_vertex_analyst_copilot.py --max-prompts 1 --model gemini-2.5-flash --location europe-west4 --credentials-path "api keys/fraud-aml-graph-.json" --skip-latest-on-error
+	$(PYTHON) scripts/run_vertex_analyst_copilot.py --max-prompts 1 --model "$(VERTEX_MODEL)" --location "$(VERTEX_LOCATION)" --credentials-path "$(VERTEX_CREDENTIALS_PATH)" --skip-latest-on-error
 
 agent-vertex-validate: agent-vertex-smoke
 	$(PYTHON) scripts/validate_vertex_analyst_outputs.py --output-dir artifacts/agent/vertex_responses/last
 
 agent-vertex-batch: agent-prompt-pack
-	$(PYTHON) scripts/run_vertex_analyst_copilot.py --max-prompts 3 --selection-strategy round_robin_dataset --request-delay-seconds 8 --model gemini-2.5-flash --fallback-model gemini-2.5-pro --location europe-west4 --credentials-path "api keys/fraud-aml-graph-.json" --skip-latest-on-error
+	$(PYTHON) scripts/run_vertex_analyst_copilot.py --max-prompts 3 --selection-strategy round_robin_dataset --request-delay-seconds 8 --model "$(VERTEX_MODEL)" --fallback-model "$(VERTEX_FALLBACK_MODEL)" --location "$(VERTEX_LOCATION)" --credentials-path "$(VERTEX_CREDENTIALS_PATH)" --skip-latest-on-error
 
 agent-vertex-batch-validate: agent-vertex-batch
 	$(PYTHON) scripts/validate_vertex_analyst_outputs.py --output-dir artifacts/agent/vertex_responses/last --min-response-count 3 --min-dataset-count 3
@@ -201,6 +205,9 @@ tree-shap:
 social-kit:
 	$(PYTHON) scripts/generate_social_media_kit.py
 
+secret-scan-tracked:
+	$(PYTHON) scripts/validate_no_secrets_tracked.py
+
 lint:
 	$(RUFF) check scripts tests
 
@@ -213,7 +220,7 @@ test:
 security-audit:
 	$(PIP_AUDIT) -r requirements.txt --progress-spinner off
 
-quality-local: lint format-check test
+quality-local: secret-scan-tracked lint format-check test
 
 sample-generate:
 	$(PYTHON) scripts/generate_synthetic_sample_data.py --output-root data/sample/transaction_event --rows-per-dataset 2500

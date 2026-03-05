@@ -12,7 +12,7 @@ Bu projede su dosyalar hazir:
 
 ## 2) IAM tarafinda zorunlu roller
 
-Service account: `fraud-aml-graph@fraud-aml-graph.iam.gserviceaccount.com`
+Service account (ornek): `YOUR_SERVICE_ACCOUNT@YOUR_GCP_PROJECT_ID.iam.gserviceaccount.com`
 
 Asagidaki roller gerekli:
 - Proje seviyesinde `roles/bigquery.jobUser` (query/load job baslatmak icin)

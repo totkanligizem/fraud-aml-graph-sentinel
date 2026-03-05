@@ -6,14 +6,16 @@ An end-to-end fraud and anti-money-laundering (AML) intelligence project that un
 
 - multi-source transaction ingestion,
 - deterministic feature/warehouse modeling,
-- statistical fraud scoring,
+- probabilistic fraud scoring,
 - queue prioritization,
 - graph intelligence,
 - BigQuery semantic analytics,
 - Vertex AI Gemini analyst copilot,
 - and a publish-ready executive dashboard.
 
-As of **2026-03-05 UTC**, all core quality gates passed and the project is in a **READY FOR PUBLISH** state.
+As of the **latest checkpoint snapshot timestamp**, all core quality gates passed and the project is in a **READY FOR PUBLISH** state.
+State is derived from checkpoint and dashboard validator artifacts:
+`reports/03_Operational_Checkpoint_Snapshot.json` and `dashboard/dashboard-data.json`.
 
 ## Table of Contents
 
@@ -62,7 +64,7 @@ Build a portfolio-grade but operationally realistic risk analytics platform that
 
 - Normalize different fraud/AML datasets into one canonical schema.
 - Preserve deterministic, rerunnable pipelines (artifact-first design).
-- Produce statistically grounded fraud probabilities and queue rankings.
+- Produce probabilistically grounded fraud scores and queue rankings.
 - Enrich decisions with graph-network risk context.
 - Bring structured Gemini analyst outputs into the same analytical surface.
 - Enforce publish quality through explicit validation gates.
@@ -128,6 +130,10 @@ flowchart TD
 - `ibm_amlsim`
 - `elliptic`
 
+Dataset licensing note:
+- Datasets are not redistributed in this repository.
+- You must obtain each dataset from its original source and comply with its license/terms.
+
 ## 6. Methodology (From Raw Data to Decision Layer)
 
 ### 6.1 Canonical Ingestion
@@ -148,8 +154,11 @@ Creates:
 - `stg_transaction_event`
 - `transaction_mart`
 - `feature_payer_24h` (point-in-time safe 24h payer activity features)
-- `feature_graph_24h` (point-in-time safe party/edge interaction features)
+- `feature_graph_24h` (point-in-time safe party/edge interaction features, including mixed windows)
 - `monitoring_mart` (daily monitoring aggregates)
+
+Naming note:
+- `feature_graph_24h` is a legacy table name. It contains both 24h and 30d interaction-window columns.
 
 Design choices:
 
@@ -185,6 +194,21 @@ Feature engineering:
   `graph_pair_txn_count_30d`, `log_graph_pair_amt_sum_30d`, `graph_reciprocal_pair_txn_count_30d`,
   `hour_of_day`, `day_of_week`
 - Categorical one-hot: `dataset_id`, `channel`, `txn_type`, `currency`
+
+### 6.3.1 Feature set evidence (baseline vs graph-aware benchmarks)
+
+| Track | Feature scope | AP | PR-AUC | Mean Precision@50 |
+|---|---|---:|---:|---:|
+| Baseline | core numeric + categorical | 0.0710 | 0.0708 | 6.91% |
+| Benchmark | baseline + graph interaction features | 0.0725 | 0.0725 | 8.73% |
+| Tree benchmark | benchmark features + non-linear learner | 0.1385 | 0.1378 | 27.07% |
+
+Graph interaction columns used in benchmarks:
+- `graph_payer_incoming_txn_count_24h`
+- `graph_payer_unique_payees_24h`
+- `graph_pair_txn_count_30d`
+- `log_graph_pair_amt_sum_30d`
+- `graph_reciprocal_pair_txn_count_30d`
 
 ### 6.4 Queue Ranking Layer
 
@@ -312,10 +336,11 @@ Deliverables:
 
 ### Cloud and platform
 
-- Google Cloud Project: `fraud-aml-graph`
-- BigQuery dataset: `fraud_aml_graph_dev`
-- Vertex AI region: `europe-west4`
-- Cloud Storage bucket (runtime artifacts): `fraud-aml-graph-vertex-ew4`
+Example names (replace with yours):
+- Google Cloud Project: `YOUR_GCP_PROJECT_ID`
+- BigQuery dataset: `YOUR_BQ_DATASET`
+- Vertex AI region: `YOUR_VERTEX_REGION`
+- Cloud Storage bucket (runtime artifacts): `YOUR_VERTEX_BUCKET`
 
 ### Languages
 
@@ -354,7 +379,7 @@ python3 -m pip install --upgrade pip
 python3 -m pip install -r requirements.txt
 ```
 
-Install engineering toolchain (tests/lint/security/XAI):
+Install engineering toolchain (tests/lint/security/optional SHAP explainability):
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
@@ -365,16 +390,21 @@ make setup-dev
 Environment variables expected by cloud scripts:
 
 ```bash
-export GCP_PROJECT_ID="fraud-aml-graph"
-export BQ_DATASET="fraud_aml_graph_dev"
-export BQ_LOCATION="EU"
+export GCP_PROJECT_ID="your-gcp-project-id"
+export BQ_DATASET="your_bq_dataset"
+export BQ_LOCATION="YOUR_BQ_LOCATION"
 export GOOGLE_APPLICATION_CREDENTIALS="/absolute/path/to/your/service-account.json"
 ```
+
+Dependency management note:
+- `requirements.txt` is the canonical runtime dependency file.
+- `requirements.lock` is generated/locked output; do not edit manually.
+- `pyproject.toml` stores tool configuration (format/lint), not the primary runtime dependency source.
 
 ## 10. Repository Structure
 
 ```text
-Fraud - AML Graph/
+fraud-aml-graph-sentinel/
 ├── Makefile
 ├── README.md
 ├── requirements.txt
@@ -475,10 +505,13 @@ make bq-analyst-check
 ### 11.5 Dashboard + final reporting
 
 ```bash
+make dashboard-build
 make dashboard-check
 make report-master
 make report-master-en
 ```
+
+`dashboard-build` generates bundle payloads, while `dashboard-check` validates payload and DOM integrity.
 
 ### 11.6 Benchmark model and comparison
 
@@ -534,6 +567,8 @@ Validation is explicit and script-driven, not implicit.
   - queue distinctness checks
   - critical data quality null/domain/collision checks
   - feature coverage thresholds for `feature_payer_24h` and `feature_graph_24h`
+- `validate_no_secrets_tracked.py`
+  - scans git-tracked files for key/token/private-key patterns before publish
 
 ### Graph gates
 
@@ -580,6 +615,7 @@ Validation is explicit and script-driven, not implicit.
 
 - GitHub Actions workflow: `.github/workflows/quality-gates.yml`
 - Runs:
+  - `python scripts/validate_no_secrets_tracked.py`
   - `ruff check scripts tests`
   - `black --check scripts tests`
   - `pytest`
@@ -613,15 +649,17 @@ Source: latest checkpoint + model-comparison snapshots.
 - Dashboard defects: **0**
 - BigQuery state gate: **PASS**
 - Vertex analyst error count: **0**
-- Final readiness: **READY FOR PUBLISH**
+- Final readiness: **READY FOR PUBLISH** (from latest checkpoint + dashboard validator artifacts)
 
 ## 14. Dashboard and How to Open It
 
 Build and serve locally:
 
 ```bash
-cd "Fraud - AML Graph"
+# If your clone folder is named differently, use your local repository folder path.
+cd fraud-aml-graph-sentinel
 make dashboard-build
+make dashboard-check
 python3 -m http.server 8080
 ```
 
@@ -636,12 +674,15 @@ Open:
 - Service-account JSON keys are local-only and gitignored.
 - `.secrets/`, `api keys/`, `.env*` are ignored by default.
 - Additional key-like extensions are ignored (`*.pem`, `*.p12`, `*.pfx`, `*.key`, `*service-account*.json`, `*credentials*.json`).
+- BigQuery production hardening should include policy-tag/column-level masking and row-level controls for PII fields.
 
 ### Before pushing
 
 - Confirm `git status` does not include key files.
 - Keep credentials in local ignored paths only.
 - If any key was exposed historically, rotate/revoke it before making the repo public.
+- Run tracked-file secret scan:
+  - `make secret-scan-tracked`
 
 ## 16. What Was Achieved, and What Can Be Extended Next
 
