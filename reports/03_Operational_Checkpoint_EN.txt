@@ -1,6 +1,6 @@
 Fraud - AML Graph Operational Checkpoint (EN)
 
-Generated at (UTC): 2026-03-05T15:09:12Z
+Generated at (UTC): 2026-03-05T15:34:09Z
 
 1) Executive Summary
 This checkpoint report summarizes the current working state of the local pipeline, graph layer, and BigQuery environment after the latest audit pass.
@@ -21,6 +21,7 @@ Estimated completion (inference): roughly 88% of MVP scope, roughly 70% of full-
 - stg_transaction_event: 1,184,807
 - transaction_mart: 1,184,807
 - feature_payer_24h: 900,000
+- feature_graph_24h: 900,000
 - monitoring_mart: 90
 - fraud_scores: 884,807
 - alert_queue queue_count: 88
@@ -70,14 +71,14 @@ Example highest-weight features:
 - shared_party_account_edge_pairs: 0
 
 9) Remaining Work
-- Final dashboard / view layer
-- Presentation-grade KPI reporting
-- Gemini-based analyst copilot
+- CI/CD hardening (lint + unit + smoke + validation-gate integration)
+- Drift monitoring and threshold-governance layer
+- Human-in-the-loop analyst feedback loop
 - Optional second-phase datasets: banksim / ibm_amlsim / elliptic
 
 10) Evidence Artifacts
 - artifacts/bigquery/validate-bigquery-state.json
-- artifacts/graph/graph-build-summary-20260227T125935Z.json
-- artifacts/models/ranking/20260227T125836Z/ranking-summary.json
-- artifacts/models/fraud_scoring/20260227T125804Z/scoring-summary.json
+- artifacts/graph/graph-build-summary-20260305T150358Z.json
+- artifacts/models/ranking/latest/ranking-summary.json
+- artifacts/models/fraud_scoring/20260305T150314Z/scoring-summary.json
 - data/warehouse/warehouse-build-summary.json

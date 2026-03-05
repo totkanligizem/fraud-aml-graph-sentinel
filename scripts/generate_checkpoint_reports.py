@@ -239,21 +239,24 @@ def build_snapshot() -> Dict[str, object]:
     warehouse_summary = load_json(ROOT / "data/warehouse/warehouse-build-summary.json")
     expected_db_path = normalize_path(warehouse_summary.get("db_path", ""))
     validate_local = load_best_bigquery_state()
-    validate_pipeline = load_json(
-        latest_json_file_matching_db_path(
-            ARTIFACTS_DIR / "models" / "fraud_scoring",
-            "*/scoring-summary.json",
-            expected_db_path,
-        )
+    scoring_summary_path = latest_json_file_matching_db_path(
+        ARTIFACTS_DIR / "models" / "fraud_scoring",
+        "*/scoring-summary.json",
+        expected_db_path,
     )
-    ranking_summary = load_json(
-        latest_json_file_matching_db_path(
-            ARTIFACTS_DIR / "models" / "ranking",
-            "*/ranking-summary.json",
-            expected_db_path,
-        )
+    ranking_summary_path = latest_json_file_matching_db_path(
+        ARTIFACTS_DIR / "models" / "ranking",
+        "*/ranking-summary.json",
+        expected_db_path,
     )
-    graph_summary = load_json(latest_json_file(ARTIFACTS_DIR / "graph", "graph-build-summary-*.json"))
+    graph_summary_path = latest_json_file_matching_db_path(
+        ARTIFACTS_DIR / "graph",
+        "graph-build-summary-*.json",
+        expected_db_path,
+    )
+    validate_pipeline = load_json(scoring_summary_path)
+    ranking_summary = load_json(ranking_summary_path)
+    graph_summary = load_json(graph_summary_path)
     model_metrics, top_features = latest_model_artifacts_for_db(
         ROOT / "artifacts/models/fraud_baseline",
         expected_db_path,
@@ -274,6 +277,11 @@ def build_snapshot() -> Dict[str, object]:
         "bq_validation_summary": bq_validation_summary,
         "bq_graph_analytics_summary": bq_graph_analytics_summary,
         "core_upload_summary": core_upload_summary,
+        "artifact_paths": {
+            "graph_summary": str(graph_summary_path),
+            "ranking_summary": str(ranking_summary_path),
+            "scoring_summary": str(scoring_summary_path),
+        },
     }
 
 
@@ -312,6 +320,7 @@ def tr_text(snapshot: Dict[str, object]) -> Tuple[str, List[str]]:
         f"- stg_transaction_event: {fmt_int(warehouse['table_counts']['stg_transaction_event'])}",
         f"- transaction_mart: {fmt_int(warehouse['table_counts']['transaction_mart'])}",
         f"- feature_payer_24h: {fmt_int(warehouse['table_counts']['feature_payer_24h'])}",
+        f"- feature_graph_24h: {fmt_int(warehouse['table_counts'].get('feature_graph_24h', 0))}",
         f"- monitoring_mart: {fmt_int(warehouse['table_counts']['monitoring_mart'])}",
         f"- fraud_scores: {fmt_int(scoring['total_scored_rows'])}",
         f"- alert_queue queue_count: {fmt_int(ranking['queue_count'])}",
@@ -361,16 +370,16 @@ def tr_text(snapshot: Dict[str, object]) -> Tuple[str, List[str]]:
         f"- shared_party_account_edge_pairs: {graph_quality.get('shared_party_account_edge_pairs', 0)}",
         "",
         "9) Kalan Isler",
-        "- Final dashboard / view katmani",
-        "- Sunuma uygun daha rafine KPI raporlari",
-        "- Gemini tabanli analyst copilot",
+        "- CI/CD genisletmesi (lint + unit + smoke + validation gate entegrasyonu)",
+        "- Drift monitoring ve threshold-governance katmani",
+        "- Human-in-the-loop analist geri besleme dongusu",
         "- Opsiyonel ikinci faz datasetleri: banksim / ibm_amlsim / elliptic",
         "",
         "10) Kanit Artefaktlari",
         "- artifacts/bigquery/validate-bigquery-state.json",
-        "- artifacts/graph/graph-build-summary-20260227T125935Z.json",
-        "- artifacts/models/ranking/20260227T125836Z/ranking-summary.json",
-        "- artifacts/models/fraud_scoring/20260227T125804Z/scoring-summary.json",
+        f"- {snapshot.get('artifact_paths', {}).get('graph_summary', 'artifacts/graph/graph-build-summary-*.json')}",
+        f"- {snapshot.get('artifact_paths', {}).get('ranking_summary', 'artifacts/models/ranking/*/ranking-summary.json')}",
+        f"- {snapshot.get('artifact_paths', {}).get('scoring_summary', 'artifacts/models/fraud_scoring/*/scoring-summary.json')}",
         "- data/warehouse/warehouse-build-summary.json",
     ]
     return title, lines
@@ -411,6 +420,7 @@ def en_text(snapshot: Dict[str, object]) -> Tuple[str, List[str]]:
         f"- stg_transaction_event: {fmt_int(warehouse['table_counts']['stg_transaction_event'])}",
         f"- transaction_mart: {fmt_int(warehouse['table_counts']['transaction_mart'])}",
         f"- feature_payer_24h: {fmt_int(warehouse['table_counts']['feature_payer_24h'])}",
+        f"- feature_graph_24h: {fmt_int(warehouse['table_counts'].get('feature_graph_24h', 0))}",
         f"- monitoring_mart: {fmt_int(warehouse['table_counts']['monitoring_mart'])}",
         f"- fraud_scores: {fmt_int(scoring['total_scored_rows'])}",
         f"- alert_queue queue_count: {fmt_int(ranking['queue_count'])}",
@@ -460,16 +470,16 @@ def en_text(snapshot: Dict[str, object]) -> Tuple[str, List[str]]:
         f"- shared_party_account_edge_pairs: {graph_quality.get('shared_party_account_edge_pairs', 0)}",
         "",
         "9) Remaining Work",
-        "- Final dashboard / view layer",
-        "- Presentation-grade KPI reporting",
-        "- Gemini-based analyst copilot",
+        "- CI/CD hardening (lint + unit + smoke + validation-gate integration)",
+        "- Drift monitoring and threshold-governance layer",
+        "- Human-in-the-loop analyst feedback loop",
         "- Optional second-phase datasets: banksim / ibm_amlsim / elliptic",
         "",
         "10) Evidence Artifacts",
         "- artifacts/bigquery/validate-bigquery-state.json",
-        "- artifacts/graph/graph-build-summary-20260227T125935Z.json",
-        "- artifacts/models/ranking/20260227T125836Z/ranking-summary.json",
-        "- artifacts/models/fraud_scoring/20260227T125804Z/scoring-summary.json",
+        f"- {snapshot.get('artifact_paths', {}).get('graph_summary', 'artifacts/graph/graph-build-summary-*.json')}",
+        f"- {snapshot.get('artifact_paths', {}).get('ranking_summary', 'artifacts/models/ranking/*/ranking-summary.json')}",
+        f"- {snapshot.get('artifact_paths', {}).get('scoring_summary', 'artifacts/models/fraud_scoring/*/scoring-summary.json')}",
         "- data/warehouse/warehouse-build-summary.json",
     ]
     return title, lines

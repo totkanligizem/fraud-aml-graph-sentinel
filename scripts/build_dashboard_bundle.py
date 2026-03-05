@@ -86,6 +86,34 @@ def load_json_if_exists(path: Path) -> Dict[str, Any] | None:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def normalize_path(value: object) -> str:
+    return Path(str(value)).as_posix()
+
+
+def latest_relative_path(directory: Path, pattern: str) -> str | None:
+    matches = sorted(directory.glob(pattern))
+    if not matches:
+        return None
+    return str(matches[-1].relative_to(ROOT))
+
+
+def latest_relative_path_matching_db(directory: Path, pattern: str, expected_db_path: str) -> str | None:
+    matches = sorted(directory.glob(pattern))
+    if not matches:
+        return None
+    expected = normalize_path(expected_db_path)
+    for path in reversed(matches):
+        payload = load_json_if_exists(path)
+        if not payload:
+            continue
+        db_path = payload.get("db_path")
+        if db_path is None:
+            continue
+        if normalize_path(db_path) == expected:
+            return str(path.relative_to(ROOT))
+    return None
+
+
 def build_dataset_breakdown(snapshot: Dict[str, Any], conn: sqlite3.Connection) -> List[Dict[str, Any]]:
     rows = fetch_rows(
         conn,
@@ -455,6 +483,50 @@ def build_insight_bullets(snapshot: Dict[str, Any], kpis: Dict[str, Any], datase
     ]
 
 
+def resolve_evidence_paths(snapshot: Dict[str, Any]) -> List[str]:
+    artifact_paths = snapshot.get("artifact_paths", {})
+    expected_db_path = snapshot.get("warehouse_summary", {}).get("db_path", "")
+
+    graph_summary_path = (
+        artifact_paths.get("graph_summary")
+        or latest_relative_path_matching_db(ROOT / "artifacts" / "graph", "graph-build-summary-*.json", expected_db_path)
+        or "artifacts/graph/graph-build-summary-*.json"
+    )
+    ranking_summary_path = (
+        artifact_paths.get("ranking_summary")
+        or latest_relative_path_matching_db(
+            ROOT / "artifacts" / "models" / "ranking",
+            "*/ranking-summary.json",
+            expected_db_path,
+        )
+        or "artifacts/models/ranking/*/ranking-summary.json"
+    )
+    scoring_summary_path = (
+        artifact_paths.get("scoring_summary")
+        or latest_relative_path_matching_db(
+            ROOT / "artifacts" / "models" / "fraud_scoring",
+            "*/scoring-summary.json",
+            expected_db_path,
+        )
+        or "artifacts/models/fraud_scoring/*/scoring-summary.json"
+    )
+
+    return [
+        "reports/03_Operational_Checkpoint_Snapshot.json",
+        "reports/03_Operational_Checkpoint_TR.pdf",
+        "artifacts/bigquery/validate-bigquery-state.json",
+        "artifacts/bigquery/validate-executive-sql-bundle.json",
+        "artifacts/dashboard/validate-dashboard-state.json",
+        graph_summary_path,
+        ranking_summary_path,
+        scoring_summary_path,
+        "artifacts/agent/casebook/latest/casebook.json",
+        "artifacts/agent/prompt_pack/latest/prompt-pack-summary.json",
+        "artifacts/agent/vertex_responses/latest/run-summary.json",
+        "data/warehouse/warehouse-build-summary.json",
+    ]
+
+
 def build_dashboard_payload(snapshot: Dict[str, Any]) -> Dict[str, Any]:
     db_path = ROOT / snapshot["warehouse_summary"]["db_path"]
     if not db_path.exists():
@@ -470,20 +542,7 @@ def build_dashboard_payload(snapshot: Dict[str, Any]) -> Dict[str, Any]:
     quality = build_quality_panels(snapshot)
     kpis = build_kpis(snapshot, dataset_breakdown, score_buckets, quality)
     analyst = build_analyst_panel()
-    evidence_paths = [
-        "reports/03_Operational_Checkpoint_Snapshot.json",
-        "reports/03_Operational_Checkpoint_TR.pdf",
-        "artifacts/bigquery/validate-bigquery-state.json",
-        "artifacts/bigquery/validate-executive-sql-bundle.json",
-        "artifacts/dashboard/validate-dashboard-state.json",
-        "artifacts/graph/graph-build-summary-20260227T125935Z.json",
-        "artifacts/models/ranking/20260227T125836Z/ranking-summary.json",
-        "artifacts/models/fraud_scoring/20260227T125804Z/scoring-summary.json",
-        "artifacts/agent/casebook/latest/casebook.json",
-        "artifacts/agent/prompt_pack/latest/prompt-pack-summary.json",
-        "artifacts/agent/vertex_responses/latest/run-summary.json",
-        "data/warehouse/warehouse-build-summary.json",
-    ]
+    evidence_paths = resolve_evidence_paths(snapshot)
     evidence_items = build_evidence_items(evidence_paths)
 
     return {

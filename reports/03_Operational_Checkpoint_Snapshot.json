@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-03-05T15:09:12Z",
+  "generated_at_utc": "2026-03-05T15:34:09Z",
   "warehouse_summary": {
     "created_at_utc": "2026-03-05T15:02:29Z",
     "db_path": "data/warehouse/ledger_sentinel.db",
@@ -399,5 +399,10 @@
         "rows_loaded": 134702
       }
     }
+  },
+  "artifact_paths": {
+    "graph_summary": "artifacts/graph/graph-build-summary-20260305T150358Z.json",
+    "ranking_summary": "artifacts/models/ranking/latest/ranking-summary.json",
+    "scoring_summary": "artifacts/models/fraud_scoring/20260305T150314Z/scoring-summary.json"
   }
 }
